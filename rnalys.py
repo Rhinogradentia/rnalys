@@ -13,6 +13,8 @@ import dash_bio as dashbio
 import pyfiglet
 import dash_bootstrap_components as dbc
 import dash_mantine_components as dmc
+import base64
+import io
 
 from dash import dcc
 from dash import html
@@ -167,7 +169,7 @@ styles = {
 
 #if overlap table exists
 
-
+'''
 #Genesymbol
 df_symbol_file = './data/ensembl_symbol.csv'
 df_symbol = pd.read_csv(df_symbol_file, sep='\t')
@@ -196,11 +198,8 @@ df_counts_combined = pd.read_csv(df_counts_combined_file, sep='\t', index_col=0)
 df_meta_combined_file = '/home/cfrisk/Dropbox/dash/data/df_meta_v3.tab'
 df_meta_combined = pd.read_csv(df_meta_combined_file, sep='\t', index_col=0)
 available_tissues = df_meta_combined['tissue'].unique()
-
-
-
-
 logging_file = 'data/logging.txt'
+'''
 
 lExclude = []
 lTissue = []
@@ -223,6 +222,25 @@ df = pd.DataFrame(data, columns=columns)
 
 layout_index = layout_index
 layout_page1 = layout_page1
+
+
+def file_len(fname):
+    with open(fname) as f:
+        for i, l in enumerate(f):
+            pass
+    return i + 1
+
+class db_res:
+    def __init__(self, name):
+        self.name = name
+        self.updn_dict = {}
+
+    def set_updn(self, indict, updn):
+        if updn == 'up':
+            self.updn_dict['up'] = indict
+        if updn == 'dn':
+            self.updn_dict['dn'] = indict
+
 
 def split_filter_part(filter_part):
     for operator_type in operators:
@@ -301,16 +319,37 @@ def parse_contents(contents, filename, date):
         })
     ])
 
-@app.callback(Output('output-data-upload', 'children'),
+@app.callback(Output('store_counts', 'children'),
               Input('upload-data', 'contents'),
               State('upload-data', 'filename'),
               State('upload-data', 'last_modified'))
-def update_output(list_of_contents, list_of_names, list_of_dates):
-    if list_of_contents is not None:
-        children = [
-            parse_contents(c, n, d) for c, n, d in
-            zip(list_of_contents, list_of_names, list_of_dates)]
-        return children
+def update_output(contents, list_of_names, list_of_dates):
+    if contents is None:
+        raise PreventUpdate
+
+    content_type, content_string = contents.split(',')
+    decoded = base64.b64decode(content_string)
+
+    df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+
+    return df.to_json(date_format='iso', orient='split')
+
+
+@app.callback(
+    Output('output-data-upload', 'children'),
+    Input('store_counts', 'data')
+)
+def output_from_store(stored_data):
+    df = pd.read_json(stored_data, orient='split')
+
+    return html.Div([
+        dash_table.DataTable(
+            df.to_dict('records'),
+            [{'name': i, 'id': i} for i in df.columns]
+        ),
+        html.Hr(),
+    ])
+
 
 @app.callback(Output("content", "children"), [Input("tabs", "active_tab")])
 def switch_tab(at):
@@ -420,11 +459,10 @@ def exclude_helper(exclude, verbose=0):
               [Input('paper', 'value')],
               [State('exclude_list', 'children')])
 def select_helper(paper, data, verbose=0):
-    if 'New' in paper:
+    if paper == 'New':
         lSamples = []
         lExclude = []
         df_meta_temp = df_meta_combined
-
         lBatch = []
         lTissue = []
         lType = []
@@ -432,7 +470,6 @@ def select_helper(paper, data, verbose=0):
     else:
         lSamples = load_dataset(paper)
         df_meta_temp = df_meta_combined[df_meta_combined['id_tissue'].isin(lSamples)]
-
         lBatch = list(df_meta_temp['SeqTag'].unique())
         lTissue = list(df_meta_temp['tissue'].unique())
         lType = list(df_meta_temp['type'].unique())
@@ -497,8 +534,6 @@ def export_plot(n_clicks, indata, prefixes):
             # Write the file out again
             with open('./data/scripts/%s' %sTotal, 'w') as file:
                 file.write(filedata)
-
-
             return ['Created plot file %s' %sTotal]
 
         else:
@@ -896,9 +931,7 @@ def generate_volcano(effects, indata, psig, xaxis, yaxis):
             title=title_,
             xlabel=xlabel,
             highlight=highlight)
-
         return [dashVolcano]
-
 
 @app.callback(
     Output('biplot_text_radio', 'options'),
@@ -943,9 +976,6 @@ def update_hpa(lgenes, input_symbol, lgenes_hgnc):
                          margin={"l": 200, "b": 100, "r": 200}, xaxis={"showticklabels": True},
                          yaxis={"title": "NX"})}
 
-
-
-
 @app.callback(
     Output('indicator-graphic2', 'figure'),
     [Input('intermediate-table', 'children'),
@@ -979,12 +1009,6 @@ def update_output1(indata, indata_de, lgenes, input_symbol, radio_grouping, lgen
             dTranslate = dict(df_symbol_sym_ind.loc[lgenes_hgnc]['ensembl_gene_id'])
             lgenes_hgnc = [dTranslate[x] for x in lgenes_hgnc]
             lgenes = lgenes + lgenes_hgnc
-
-        #lgenes2 = lgenes
-        #lgenes = []
-        #for gene in lgenes2:
-        #    if gene in df_counts_temp.index.values:
-        #        lgene.append(gene)
 
         if input_symbol == 'Symbol':
             dTranslate = dict(df_symbol.loc[lgenes]['hgnc_symbol'])
@@ -1163,9 +1187,6 @@ def update_pca_and_barplot(indata, radio_coloring, input2, radio_text, number_of
 
         df_meta_for_corr = df_meta_temp.dropna(axis='columns')
         correlation_matrix = df_meta_for_corr.corrwith(principalDf['PCA1'], method='pearson')
-        #print(df_meta_temp)
-        #correlation_matrix = correlation_matrix.fillna(0)
-        #correlation_matrix = correlation_matrix.dropna()
 
         lPCA_data = []
         lPCA_data.append({
@@ -1263,7 +1284,6 @@ def update_de_table(n_clicks, effects, indata, sig_value, basemean):
             df_degenes.to_csv('data/generated/%s' %name, sep='\t')
 
             return df_degenes.to_dict('records'), sig_value, number_of_degenes
-
 
 
 @app.callback(
@@ -1382,23 +1402,6 @@ def run_DE_analysis(n_clicks, indata, radiode, transformation, force_run, rowsum
         return json.dumps(datasets), 'temp', ''
 
 
-def file_len(fname):
-    with open(fname) as f:
-        for i, l in enumerate(f):
-            pass
-    return i + 1
-
-class db_res:
-    def __init__(self, name):
-        self.name = name
-        self.updn_dict = {}
-
-    def set_updn(self, indict, updn):
-        if updn == 'up':
-            self.updn_dict['up'] = indict
-        if updn == 'dn':
-            self.updn_dict['dn'] = indict
-
 @app.callback(
     Output('Enrichr_GO_bp_up', 'figure'),
     Input('Enrichr_GO_bp_up_ph', 'figure')
@@ -1453,9 +1456,6 @@ def enrichr_tab_out(in1):
 )
 def enrichr_tab_out(in1):
     return in1
-
-
-
 
 ##Enrichr
 @app.callback(
@@ -1570,7 +1570,6 @@ def enrichr_up(n_clicks, indata, indata_de, sig_value):
 
 if __name__ == "__main__":
     #app.run_server(debug=True, host='130.238.239.158')
-
     ascii_banner = pyfiglet.figlet_format("RNA analysis")
     print(ascii_banner)
     app.run_server(debug=True, host='localhost')

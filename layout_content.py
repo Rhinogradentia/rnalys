@@ -71,7 +71,6 @@ else:
     os.system('touch data/datasets.txt')
 
 layout_index = html.Div([
-
     html.Div([
        html.P('Setup')
     ]),
@@ -95,6 +94,7 @@ layout_index = html.Div([
             # Allow multiple files to be uploaded
             multiple=False
         ),
+        dcc.Store(id='store_counts'),
         html.Div(id='output-data-upload'),
 
         dcc.Upload(
@@ -116,17 +116,15 @@ layout_index = html.Div([
             # Allow multiple files to be uploaded
             multiple=False
         ),
+        dcc.Store(id='store_info'),
         html.Div(id='output-data-upload-info'),
 
     ]),
 
     dcc.Link('DE + PCA + Enrichr', href='/page-1'),
-
     html.Br(),
     #dcc.Link('WGCNA + Enrichr', href='/page-2'),
 ])
-
-
 
 layout_page1 = html.Div(
     children=[
@@ -139,8 +137,6 @@ layout_page1 = html.Div(
                 html.H2(className="h2-title", children="RNA-analysis"),
             ],
         ),
-
-
         html.Div([
             html.Div([
                 html.P('Load dataset:',
@@ -166,7 +162,6 @@ layout_page1 = html.Div(
         ]),
 
         html.P(id='dataset_name_placeholder'),
-
         html.Div([
             html.Div([
                 html.Div([
@@ -187,7 +182,6 @@ layout_page1 = html.Div(
 
                     html.Div([
                         html.P('Tissue:',style={'width': '10%', 'display': 'flex', 'verticalAlign':"middle", 'padding':'5px'}),
-                        #style={'width': '20%', 'display': 'flex'}
                         html.Div([
                             dcc.Dropdown(
                             id='tissue_dropdown',
