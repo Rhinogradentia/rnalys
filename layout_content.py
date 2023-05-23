@@ -70,6 +70,7 @@ if os.path.isfile('data/datasets.txt'):
 else:
     os.system('touch data/datasets.txt')
 
+
 layout_index = html.Div([
     html.Div([
        html.P('Setup')
@@ -94,11 +95,11 @@ layout_index = html.Div([
             # Allow multiple files to be uploaded
             multiple=False
         ),
-        dcc.Store(id='store_counts'),
-        html.Div(id='output-data-upload'),
+
+        #html.Div(id='store_counts'),
 
         dcc.Upload(
-            id='upload-data_info',
+            id='upload-data-info',
             children=html.Div([
                 'Drag and Drop or ',
                 html.A('Select Info File')
@@ -116,14 +117,38 @@ layout_index = html.Div([
             # Allow multiple files to be uploaded
             multiple=False
         ),
-        dcc.Store(id='store_info'),
-        html.Div(id='output-data-upload-info'),
 
     ]),
+
+    html.Div([
+            dmc.Alert(
+                "",
+                id="alert_import",
+                color='info',
+                #is_open=True,
+                withCloseButton=True,
+                # n_clicks=0,
+            ),
+    ], style={'textAlign': 'left', 'width': '30%', 'margin-top': 5}),
+
+    html.Div([
+        dmc.Alert(
+            "",
+            id="alert_import_info",
+            color='info',
+            # is_open=True,
+            withCloseButton=True,
+            # n_clicks=0,
+        ),
+    ], style={'textAlign': 'left', 'width': '30%', 'margin-top': 5}),
 
     dcc.Link('DE + PCA + Enrichr', href='/page-1'),
     html.Br(),
     #dcc.Link('WGCNA + Enrichr', href='/page-2'),
+    #html.Div(id='df_counts', style={'display': 'none'}),
+    #html.Div(id='df_info', style={'display': 'none'}),
+
+
 ])
 
 layout_page1 = html.Div(
@@ -137,6 +162,8 @@ layout_page1 = html.Div(
                 html.H2(className="h2-title", children="RNA-analysis"),
             ],
         ),
+
+
         html.Div([
             html.Div([
                 html.P('Load dataset:',

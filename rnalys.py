@@ -69,9 +69,10 @@ app = dash.Dash(
 
 url_bar_and_content_div = html.Div([
     dcc.Location(id='url', refresh=False),
+    dcc.Store(id='df_counts'),#, storage_type='session'),
+    dcc.Store(id='df_info'),# storage_type='session'),
     html.Div(id='page-content')
 ])
-
 
 
 #PAGE 2 preprocessing
@@ -169,7 +170,7 @@ styles = {
 
 #if overlap table exists
 
-'''
+
 #Genesymbol
 df_symbol_file = './data/ensembl_symbol.csv'
 df_symbol = pd.read_csv(df_symbol_file, sep='\t')
@@ -191,7 +192,7 @@ for k, v in dTranslate.items():
 df_symbol_sym_ind.index = df_symbol_sym_ind.index.fillna('NaN')
 hgnc_dropdown = list(df_symbol_sym_ind.index)
 
-
+'''
 df_counts_combined_file = '/home/cfrisk/Dropbox/dash/data/df_counts_combined.tab'
 df_counts_combined = pd.read_csv(df_counts_combined_file, sep='\t', index_col=0)
 
@@ -219,7 +220,6 @@ columns = ['Ensembl', 'hgnc', 'baseMean', 'log2FoldChange', 'pvalue', 'padj']
 data = [['ens', 'hgnc1', 10, 4, 0.005, 0.9995]]
 df = pd.DataFrame(data, columns=columns)
 
-
 layout_index = layout_index
 layout_page1 = layout_page1
 
@@ -240,31 +240,6 @@ class db_res:
             self.updn_dict['up'] = indict
         if updn == 'dn':
             self.updn_dict['dn'] = indict
-
-
-def split_filter_part(filter_part):
-    for operator_type in operators:
-        for operator in operator_type:
-            if operator in filter_part:
-                name_part, value_part = filter_part.split(operator, 1)
-                name = name_part[name_part.find('{') + 1: name_part.rfind('}')]
-
-                value_part = value_part.strip()
-                v0 = value_part[0]
-                if (v0 == value_part[-1] and v0 in ("'", '"', '`')):
-                    value = value_part[1: -1].replace('\\' + v0, v0)
-                else:
-                    try:
-                        value = float(value_part)
-                    except ValueError:
-                        value = value_part
-
-                # word operators need spaces after them in the filter string,
-                # but we don't want these later
-                return name, operator_type[0].strip(), value
-
-    return [None] * 3
-
 
 def save_dataset_to_file(lFilename_list):
     dataset_file = open('data/datasets.txt', 'a')
@@ -319,36 +294,56 @@ def parse_contents(contents, filename, date):
         })
     ])
 
-@app.callback(Output('store_counts', 'children'),
+@app.callback(Output('df_counts', 'data'),
+              Output('alert_import', 'value'),
               Input('upload-data', 'contents'),
               State('upload-data', 'filename'),
               State('upload-data', 'last_modified'))
-def update_output(contents, list_of_names, list_of_dates):
+def update_output(contents, filename, date):
     if contents is None:
         raise PreventUpdate
 
     content_type, content_string = contents.split(',')
     decoded = base64.b64decode(content_string)
 
-    df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+    if 'csv' in filename:
+        sep=','
+    elif 'tab' in filename:
+        sep = '\t'
+    elif 'tsv' in filename:
+        sep = '\t'
+    else:
+        return pd.DataFrame(), 'File name extension not recongized, accepted extensions are csv, tab, tsv'
 
-    return df.to_json(date_format='iso', orient='split')
+    df = pd.read_csv(io.StringIO(decoded.decode('utf-8')), sep=sep, index_col=0)
+    #print(df)
+    return df.to_json(date_format='iso', orient='split'), ''
 
+@app.callback(Output('df_info', 'data'),
+              Output('alert_import_info', 'value'),
+              Input('upload-data-info', 'contents'),
+              State('upload-data-info', 'filename'),
+              State('upload-data-info', 'last_modified'))
+def update_output(contents, filename, date):
+    if contents is None:
+        raise PreventUpdate
 
-@app.callback(
-    Output('output-data-upload', 'children'),
-    Input('store_counts', 'data')
-)
-def output_from_store(stored_data):
-    df = pd.read_json(stored_data, orient='split')
+    content_type, content_string = contents.split(',')
+    decoded = base64.b64decode(content_string)
 
-    return html.Div([
-        dash_table.DataTable(
-            df.to_dict('records'),
-            [{'name': i, 'id': i} for i in df.columns]
-        ),
-        html.Hr(),
-    ])
+    if 'csv' in filename:
+        sep=','
+    elif 'tab' in filename:
+        sep = '\t'
+    elif 'tsv' in filename:
+        sep = '\t'
+    else:
+        return pd.DataFrame(), 'File extension not recongized, accepted extensions are csv, tab, tsv'
+
+    df = pd.read_csv(io.StringIO(decoded.decode('utf-8')), sep=sep, index_col=0)
+    print(df)
+    return df.to_json(date_format='iso', orient='split'), ''
+
 
 
 @app.callback(Output("content", "children"), [Input("tabs", "active_tab")])
@@ -358,8 +353,6 @@ def switch_tab(at):
     elif at == "tab-2":
         return dcc.Graph(id='hpa_graph')
     return html.P("This shouldn't ever be displayed...")
-
-
 
 @app.callback(Output("enrichr_content", "children"), [Input("enrichr_tabs", "active_tab")])
 def switch_tab(at):
@@ -381,7 +374,6 @@ def switch_tab(at):
         return dcc.Graph(id='Enrichr_kegg_dn')
     return html.P("This shouldn't ever be displayed...")
 
-
 @app.callback(
     Output('dataset_name_placeholder', 'children'),
     Input('btn-save_dataset', 'n_clicks_timestamp'),
@@ -393,7 +385,6 @@ def save_dataset(n_clicks, selected_data, dataset_name):
 
     datasets = json.loads(selected_data)
     lSamples = json.loads(datasets['samples'])
-    #print(dataset_name, ' '.join(lSamples))
     dataset_name = ''.join(dataset_name.split())
     print([dataset_name, ' '.join(lSamples)])
     save_dataset_to_file([dataset_name, ' '.join(lSamples)])
@@ -408,7 +399,6 @@ def display_page(pathname):
     else:
         return layout_index
 
-
 def load_dataset(paper):
     datasets_file = 'data/datasets.txt'
 
@@ -417,7 +407,6 @@ def load_dataset(paper):
             for line in f:
                 if line.split()[0] == paper:
                     samples = line.split()[1:]
-
     return samples
 
 def table_type(df_column):
@@ -425,7 +414,6 @@ def table_type(df_column):
 
     if sys.version_info < (3, 0):  # Pandas 1.0.0 does not support Python 2
         return 'any'
-
     if isinstance(df_column.dtype, pd.DatetimeTZDtype):
         return 'datetime',
     elif (isinstance(df_column.dtype, pd.StringDtype) or
@@ -457,44 +445,47 @@ def exclude_helper(exclude, verbose=0):
                Output('tissue_dropdown', 'value'),
                Output('type_dropdown', 'value')],
               [Input('paper', 'value')],
-              [State('exclude_list', 'children')])
-def select_helper(paper, data, verbose=0):
-    if paper == 'New':
-        lSamples = []
-        lExclude = []
-        df_meta_temp = df_meta_combined
-        lBatch = []
-        lTissue = []
-        lType = []
+              [State('exclude_list', 'children'),
+               State('df_info', 'data')])
+def select_helper(paper, data, df_info,verbose=0):
 
+    if df_info is not None:
+        df_info = pd.read_json(df_info, orient='split')
+
+        if paper == 'New':
+            lSamples = []
+            lExclude = []
+            #df_info_temp = df_info
+            lBatch = []
+            lTissue = []
+            lType = []
+
+        else:
+            lSamples = load_dataset(paper)
+            df_info_temp = df_info[df_info['id_tissue'].isin(lSamples)]
+            lBatch = list(df_info_temp['SeqTag'].unique())
+            lTissue = list(df_info_temp['tissue'].unique())
+            lType = list(df_info_temp['type'].unique())
+
+        if data:
+            exclude_list = json.loads(data)
+
+        df_info_temp = df_info[df_info['SeqTag'].isin(lBatch)]
+        df_info_temp = df_info_temp[df_info_temp['tissue'].isin(lTissue)]
+        df_info_temp = df_info_temp[df_info_temp['type'].isin(lType)]
+        lExclude = list(df_info_temp[~df_info_temp['id_tissue'].isin(lSamples)].index)
+
+        if verbose == 1:
+            print('/////////////////////////////////////7')
+            print(df_meta_temp)
+            print(lTissue)
+            print(lType)
+            print(lBatch)
+            print('/////////////////////////////////////7')
+
+        return lExclude, lBatch, lTissue, lType
     else:
-        lSamples = load_dataset(paper)
-        df_meta_temp = df_meta_combined[df_meta_combined['id_tissue'].isin(lSamples)]
-        lBatch = list(df_meta_temp['SeqTag'].unique())
-        lTissue = list(df_meta_temp['tissue'].unique())
-        lType = list(df_meta_temp['type'].unique())
-
-    if data:
-        exclude_list = json.loads(data)
-
-
-
-    df_meta_temp = df_meta_combined[df_meta_combined['SeqTag'].isin(lBatch)]
-    df_meta_temp = df_meta_temp[df_meta_temp['tissue'].isin(lTissue)]
-    df_meta_temp = df_meta_temp[df_meta_temp['type'].isin(lType)]
-    lExclude = list(df_meta_temp[~df_meta_temp['id_tissue'].isin(lSamples)].index)
-
-    if verbose == 1:
-        print('/////////////////////////////////////7')
-        print(df_meta_temp)
-        print(lTissue)
-        print(lType)
-        print(lBatch)
-
-        print('/////////////////////////////////////7')
-
-    return lExclude, lBatch, lTissue, lType
-
+        raise PreventUpdate
 
 @app.callback(
     Output('export_plot_clicked', 'children'),
@@ -509,18 +500,13 @@ def export_plot(n_clicks, indata, prefixes):
 
             datasets = json.loads(indata)
             df_degenes = pd.read_json(datasets['de_table'], orient='split')
-
             #dTranslate = dict(df_symbol.loc[df_degenes.index]['hgnc_symbol'])
             #print(df_degenes.index)
             df_degenes['hgnc'] = [dTranslate.get(x, x) for x in df_degenes.index]
-
-
             prefixes = json.loads(prefixes)
             lTotal = json.loads(prefixes['prefixes'])
             sTotal = '_'.join(lTotal)
-
             sTotal_deplot = sTotal + '_for_DEplot.tab'
-
             df_degenes.to_csv('data/generated/%s' %sTotal_deplot, sep='\t')
             sTotal = sTotal + '_volcano.R'
 
@@ -541,6 +527,14 @@ def export_plot(n_clicks, indata, prefixes):
             return ['Can not create plot (run the analysis)']
 
 
+#@app.callback(
+#    Output('output-data-upload', 'children'),
+#    Input('df_counts', 'data')
+#)
+#def output_from_store(stored_data):
+#    df = pd.read_json(stored_data, orient='split')
+
+
 #Function to only update select data table
 @app.callback(
     [Output('selected_data', 'children'),
@@ -550,10 +544,13 @@ def export_plot(n_clicks, indata, prefixes):
     Input('tissue_dropdown', 'value'),
     Input('type_dropdown', 'value'),
     Input('transformation', 'value'),],
+    [State('df_info', 'data')],
     prevent_initial_call=True)
-def select_info(lExclude, batch_dropdown,  tissue_dropdown, type_dropdown, transformation):
+def select_info(lExclude, batch_dropdown,  tissue_dropdown, type_dropdown, transformation, df_info):
 
     if batch_dropdown is not None and tissue_dropdown is not None and type_dropdown is not None and transformation is not None:
+
+        df_info = pd.read_json(df_info, orient='split')
 
         if 'LVRV' in tissue_dropdown:
             tissue_dropdown = tissue_dropdown + ['LV', 'RV']
@@ -567,20 +564,20 @@ def select_info(lExclude, batch_dropdown,  tissue_dropdown, type_dropdown, trans
         else:
             transformation = transformation
 
-        df_meta_temp = df_meta_combined.loc[df_meta_combined['SeqTag'].isin(batch_dropdown),]
-        df_meta_temp = df_meta_temp.loc[df_meta_temp['tissue'].isin(tissue_dropdown),]
-        df_meta_temp = df_meta_temp.loc[df_meta_temp['type'].isin(type_dropdown), ]
+        df_info_temp = df_info.loc[df_info['SeqTag'].isin(batch_dropdown),]
+        df_info_temp = df_info_temp.loc[df_info_temp['tissue'].isin(tissue_dropdown),]
+        df_info_temp = df_info_temp.loc[df_info_temp['type'].isin(type_dropdown), ]
 
         if lExclude is not None:
-            df_meta_temp = df_meta_temp.loc[~df_meta_temp['id_tissue'].isin(lExclude), ]
+            df_info_temp = df_info_temp.loc[~df_info_temp['id_tissue'].isin(lExclude), ]
 
 
-        datasets = {'tissues': json.dumps(df_meta_temp['tissue'].unique().tolist()),
+        datasets = {'tissues': json.dumps(df_info_temp['tissue'].unique().tolist()),
                     'transformation': transformation,
-                    'types': json.dumps(df_meta_temp['type'].unique().tolist()),
-                    'batches': json.dumps(df_meta_temp['SeqTag'].unique().tolist()),
+                    'types': json.dumps(df_info_temp['type'].unique().tolist()),
+                    'batches': json.dumps(df_info_temp['SeqTag'].unique().tolist()),
                     'exclude': json.dumps(lExclude),
-                    'samples': json.dumps(df_meta_temp['id_tissue'].to_list()),
+                    'samples': json.dumps(df_info_temp['id_tissue'].to_list()),
                     'empty': '0'}
 
         return json.dumps(datasets), ''
@@ -716,124 +713,133 @@ def add_de_set(btn_add, btn_clear, indata_de, detable_comp, indata):
     State('full_text', 'value'),
     State('force_run', 'value'),
     State('tissue_dropdown', 'value'),
+    State('df_counts', 'data'),
+    State('df_info', 'data'),
     prevent_initial_call=True,)
-def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_run, tissue_dropdn):
+def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_run, tissue_dropdn, df_counts, df_info):
     #print(n_clicks)
     if n_clicks is 0:
         raise PreventUpdate
     else:
-        out_folder = 'data/generated'
-        if not os.path.isdir(out_folder):
-            cmd = 'mkdir %s' % out_folder
-            os.system(cmd)
+        if df_counts is not None:
+            df_counts = pd.read_json(df_counts, orient='split')
+            df_info = pd.read_json(df_info, orient='split')
+            out_folder = 'data/generated'
+            if not os.path.isdir(out_folder):
+                cmd = 'mkdir %s' % out_folder
+                os.system(cmd)
 
-        #print(selected_data)
-        datasets = json.loads(selected_data)
+            #print(selected_data)
+            datasets = json.loads(selected_data)
 
-        empty = json.loads(datasets['empty'])
-        if empty != '0':
+            empty = json.loads(datasets['empty'])
+            if empty != '0':
 
-            tissue_dropdown = json.loads(datasets['tissues'])
-            type_dropdown = json.loads(datasets['types'])
-            batch_dropdown = json.loads(datasets['batches'])
-            exclude = json.loads(datasets['exclude'])
-            transformation = datasets['transformation']
-            lSamples = json.loads(datasets['samples'])
+                tissue_dropdown = json.loads(datasets['tissues'])
+                type_dropdown = json.loads(datasets['types'])
+                batch_dropdown = json.loads(datasets['batches'])
+                exclude = json.loads(datasets['exclude'])
+                transformation = datasets['transformation']
+                lSamples = json.loads(datasets['samples'])
 
-            #print('tissue_dropdown:', tissue_dropdown)
+                #print('tissue_dropdown:', tissue_dropdown)
 
-            if 'HF' in type_dropdown:
-                df_meta_combined['type'] = df_meta_combined['type'].apply(change_to_hf)
+                if 'HF' in type_dropdown:
+                    df_info['type'] = df_info['type'].apply(change_to_hf)
 
-            if 'LVRV' in tissue_dropdn:
-                df_meta_combined['tissue'] = df_meta_combined['tissue'].apply(change_to_LVRV)
+                if 'LVRV' in tissue_dropdn:
+                    df_info['tissue'] = df_info['tissue'].apply(change_to_LVRV)
 
-            if 'EFSF' in tissue_dropdn:
-                df_meta_combined['tissue'] = df_meta_combined['tissue'].apply(change_to_EFSF)
+                if 'EFSF' in tissue_dropdn:
+                    df_info['tissue'] = df_info['tissue'].apply(change_to_EFSF)
 
-            if len(lSamples) == 0:
-                # Fiter tissue
-                df_meta_temp = df_meta_combined.loc[
-                    df_meta_combined.loc[df_meta_combined['tissue'].isin(tissue_dropdown),].index]
-                # Filter type
-                df_meta_temp = df_meta_temp.loc[
-                    df_meta_temp.loc[df_meta_temp['type'].isin(type_dropdown),].index]
-                # Filter batch
-                df_meta_temp = df_meta_temp.loc[df_meta_temp['SeqTag'].isin(batch_dropdown),]
+                if len(lSamples) == 0:
+                    # Fiter tissue
+                    df_info_temp = df_info.loc[
+                        df_info.loc[df_info['tissue'].isin(tissue_dropdown),].index]
+                    # Filter type
+                    df_info_temp = df_info_temp.loc[
+                        df_info_temp.loc[df_info_temp['type'].isin(type_dropdown),].index]
+                    # Filter batch
+                    df_info_temp = df_info_temp.loc[df_info_temp['SeqTag'].isin(batch_dropdown),]
+
+                    if exclude:
+                        for sample_excl in exclude:
+                            if sample_excl in df_info_temp.index:
+                                df_info_temp = df_info_temp.drop(sample_excl)
+                else:
+                    print(lSamples)
+                    #loading samples from datasets.txt
+                    df_info_temp = df_info.loc[lSamples,]
+
+                if fulltext:
+                    df_counts_raw = df_counts[df_info_temp.index]
+                    df_info_temp.index = df_info_temp[['id_tissue', 'type']].apply(lambda x: '_'.join(x), axis=1)
+                    #Change names in count files
+                    df_counts_raw.columns = df_info_temp.index
+                else:
+                    df_counts_raw = df_counts[df_info_temp.index]
 
                 if exclude:
-                    for sample_excl in exclude:
-                        if sample_excl in df_meta_temp.index:
-                            df_meta_temp = df_meta_temp.drop(sample_excl)
-            else:
-                #loading samples from datasets.txt
-                df_meta_temp = df_meta_combined.loc[lSamples,]
+                    exclude = [x.split('SLL')[1] for x in exclude]
+                else:
+                    exclude = ['']
+                #print(df_meta_combined['tissue'])
+                lTotal = exclude + tissue_dropdown + batch_dropdown + type_dropdown
+                sPrefix_tissue_batch_type = tissue_dropdown + batch_dropdown + type_dropdown+[transformation]
 
-            if fulltext:
-                df_counts_raw = df_counts_combined[df_meta_temp.index]
-                df_meta_temp.index = df_meta_temp[['id_tissue', 'type']].apply(lambda x: '_'.join(x), axis=1)
-                #Change names in count files
-                df_counts_raw.columns = df_meta_temp.index
-            else:
-                df_counts_raw = df_counts_combined[df_meta_temp.index]
+                name_counts_for_pca = './data/generated/' + ''.join(lTotal) + '_counts.tab'
+                name_meta_for_pca = './data/generated/' + ''.join(lTotal) + '_meta.tab'
 
-            if exclude:
-                exclude = [x.split('SLL')[1] for x in exclude]
-            else:
-                exclude = ['']
-            #print(df_meta_combined['tissue'])
-            lTotal = exclude + tissue_dropdown + batch_dropdown + type_dropdown
-            sPrefix_tissue_batch_type = tissue_dropdown + batch_dropdown + type_dropdown+[transformation]
-
-            name_counts_for_pca = './data/generated/' + ''.join(lTotal) + '_counts.tab'
-            name_meta_for_pca = './data/generated/' + ''.join(lTotal) + '_meta.tab'
-
-            #remember
-            #dTranslate = dict(df_symbol['hgnc_symbol'])
-            #df_counts_raw.index = [dTranslate.get(x, x) for x in df_counts_raw.index]
+                #remember
+                #dTranslate = dict(df_symbol['hgnc_symbol'])
+                #df_counts_raw.index = [dTranslate.get(x, x) for x in df_counts_raw.index]
 
 
-            df_counts_raw.to_csv(name_counts_for_pca, sep='\t')
-            df_meta_temp.to_csv(name_meta_for_pca, sep='\t')
+                df_counts_raw.to_csv(name_counts_for_pca, sep='\t')
+                df_info_temp.to_csv(name_meta_for_pca, sep='\t')
 
-            # Setup the design for linear model
-            if rm_confounding != None:
-                performance = 'batch_'+str(rm_confounding)
+                # Setup the design for linear model
+                if rm_confounding != None:
+                    performance = 'batch_'+str(rm_confounding)
 
-            else:
-                performance = 'batch_nobatch'
+                else:
+                    performance = 'batch_nobatch'
 
-            #Run R script for normalization and transformation
-            print('PERFOMRAMCE', performance)
-            name_out = './data/generated/' + ''.join(lTotal) + '_' + performance + '_' + transformation + '_normalized.tab'
-            cmd = 'Rscript ./functions/normalize_vsd_rlog_removebatch2.R %s %s %s %s %s' % (
-                name_counts_for_pca, name_meta_for_pca, performance, name_out, transformation)
+                #Run R script for normalization and transformation
+                print('PERFOMRAMCE', performance)
+                name_out = './data/generated/' + ''.join(lTotal) + '_' + performance + '_' + transformation + '_normalized.tab'
+                cmd = 'Rscript ./functions/normalize_vsd_rlog_removebatch2.R %s %s %s %s %s' % (
+                    name_counts_for_pca, name_meta_for_pca, performance, name_out, transformation)
 
-            if not os.path.isfile(name_out):
-                print(cmd)
-                os.system(cmd)
-            else:
-                if force_run:
+                if not os.path.isfile(name_out):
                     print(cmd)
                     os.system(cmd)
                 else:
-                    print('Loading file: %s' %name_out)
+                    if force_run:
+                        print(cmd)
+                        os.system(cmd)
+                    else:
+                        print('Loading file: %s' %name_out)
 
-            df_counts_temp_norm = pd.read_csv(name_out, sep='\t', index_col=0)
+                df_counts_temp_norm = pd.read_csv(name_out, sep='\t', index_col=0)
 
-            datasets = {'counts_norm': df_counts_temp_norm.to_json(orient='split', date_format='iso'),
-                        'transformation': transformation,
-                        'meta': df_meta_temp.to_json(orient='split', date_format='iso'),
-                        'counts_raw': df_counts_raw.to_json(orient='split', date_format='iso'),
-                        'counts_raw_file_name': json.dumps(name_counts_for_pca),
-                        'perf_file': json.dumps(name_out),
-                        'prefixes': json.dumps(lTotal),
-                        'prefix_sub': json.dumps(sPrefix_tissue_batch_type)}
+                datasets = {'counts_norm': df_counts_temp_norm.to_json(orient='split', date_format='iso'),
+                            'transformation': transformation,
+                            'meta': df_info_temp.to_json(orient='split', date_format='iso'),
+                            'counts_raw': df_counts_raw.to_json(orient='split', date_format='iso'),
+                            'counts_raw_file_name': json.dumps(name_counts_for_pca),
+                            'perf_file': json.dumps(name_out),
+                            'prefixes': json.dumps(lTotal),
+                            'prefix_sub': json.dumps(sPrefix_tissue_batch_type)}
 
-            outf = '_'.join(lTotal)
-        alert_mess = 'test out'
+                outf = '_'.join(lTotal)
+            alert_mess = 'test out'
 
-        return json.dumps(datasets), alert_mess, ''
+            return json.dumps(datasets), alert_mess, ''
+
+        else:
+            raise PreventUpdate
 
 @app.callback(
     Output('barplot', 'figure'),
