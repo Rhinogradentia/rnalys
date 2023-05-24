@@ -488,7 +488,7 @@ def select_var_div(df_info):
 @app.callback([Output('exclude', 'value'),
               Output('variable3_selected_dropdown', 'value'),
                Output('variable1_selected_dropdown', 'value'),
-               Output('variable1_selected_dropdown', 'value')],
+               Output('variable2_selected_dropdown', 'value')],
               [Input('paper', 'value')],
               [State('exclude_list', 'children'),
                State('df_info', 'data')])

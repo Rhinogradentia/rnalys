@@ -51,6 +51,7 @@ def b64_image(image_filename):
     return 'data:image/png;base64,' + base64.b64encode(image).decode('utf-8')
 
 #TODO set variables in index, tissue, batch, class
+
 df_counts_combined_file = '/home/cfrisk/Dropbox/dash/data/df_counts_combined.tab'
 df_counts_combined = pd.read_csv(df_counts_combined_file, sep='\t', index_col=0)
 
@@ -143,7 +144,7 @@ layout_page1 = html.Div(
 
                         html.Div([
                             dcc.Dropdown(
-                                id='variable1_selected_dropdown',
+                                id='variable2_selected_dropdown',
                                 #options=[{'label': j, 'value': j} for j in df_meta_combined['type'].unique().tolist() + ['HF']],
                                 #value=[''],
                                 multi=True,
