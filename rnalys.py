@@ -75,101 +75,6 @@ url_bar_and_content_div = html.Div([
 ])
 
 
-#PAGE 2 preprocessing
-
-def Sort_Tuple(tup):
-    return (sorted(tup, key=lambda x: x[1], reverse=True))
-
-
-default_stylesheet = [
-    {
-        "selector": 'node',
-        'style': {
-            "opacity": 0.65,
-            'z-index': 9999
-        }
-    },
-    {
-        "selector": 'edge',
-        'style': {
-            "curve-style": "bezier",
-            "opacity": 0.45,
-            'z-index': 5000
-        }
-    },
-    {
-        'selector': '.followerNode',
-        'style': {
-            'background-color': '#0074D9'
-        }
-    },
-    {
-        'selector': '.followerEdge',
-        "style": {
-            "mid-target-arrow-color": "blue",
-            "mid-target-arrow-shape": "vee",
-            "line-color": "#0074D9"
-        }
-    },
-    {
-        'selector': '.followingNode',
-        'style': {
-            'background-color': '#FF4136'
-        }
-    },
-    {
-        'selector': '.followingEdge',
-        "style": {
-            "mid-target-arrow-color": "red",
-            "mid-target-arrow-shape": "vee",
-            "line-color": "#FF4136",
-        }
-    },
-    {
-        "selector": '.genesis',
-        "style": {
-            'background-color': '#B10DC9',
-            "border-width": 2,
-            "border-color": "purple",
-            "border-opacity": 1,
-            "opacity": 1,
-
-            "label": "data(label)",
-            "color": "#B10DC9",
-            "text-opacity": 1,
-            "font-size": 34,
-            'z-index': 9999
-        }
-    },
-    {
-        'selector': ':selected',
-        "style": {
-            'background-color': 'yellow',
-            "border-width": 14,
-            "border-color": "yellow",
-            "border-opacity": 1,
-            "opacity": 1,
-            "label": "data(label)",
-            "color": "black",
-            "font-size": 74,
-            'z-index': 9999
-        }
-    }
-]
-
-
-# ################################# APP LAYOUT ################################
-styles = {
-    'json-output': {
-        'overflow-y': 'scroll',
-        'height': 'calc(50% - 25px)',
-        'border': 'thin lightgrey solid'
-    },
-    'tab': {'height': 'calc(98vh - 115px)'}
-}
-
-#if overlap table exists
-
 
 #Genesymbol
 df_symbol_file = './data/ensembl_symbol.csv'
@@ -191,16 +96,6 @@ for k, v in dTranslate.items():
 
 df_symbol_sym_ind.index = df_symbol_sym_ind.index.fillna('NaN')
 hgnc_dropdown = list(df_symbol_sym_ind.index)
-
-'''
-df_counts_combined_file = '/home/cfrisk/Dropbox/dash/data/df_counts_combined.tab'
-df_counts_combined = pd.read_csv(df_counts_combined_file, sep='\t', index_col=0)
-
-df_meta_combined_file = '/home/cfrisk/Dropbox/dash/data/df_meta_v3.tab'
-df_meta_combined = pd.read_csv(df_meta_combined_file, sep='\t', index_col=0)
-available_tissues = df_meta_combined['tissue'].unique()
-logging_file = 'data/logging.txt'
-'''
 
 lExclude = []
 lTissue = []
@@ -259,7 +154,6 @@ app.layout = serve_layout
 
 def parse_contents(contents, filename, date):
     content_type, content_string = contents.split(',')
-
     decoded = base64.b64decode(content_string)
     try:
         if 'csv' in filename:
@@ -294,8 +188,46 @@ def parse_contents(contents, filename, date):
         })
     ])
 
+#TODO check compability between info and counts data
+
+#@app.callback(Output('df_combability_check'), 'value')
+
+@app.callback(
+            Output('alert_import_info', 'value'),
+            Output('alert_import_info_div', 'style'),
+            Output('page_proceed', 'style'),
+            Input('df_counts', 'data'),
+            Input('df_info', 'data'),
+            Input('variable_selection1','value'),
+            Input('variable_selection2','value'),
+            Input('variable_selection3','value'))
+def update_alert_import(df_counts, df_info, var1, var2, var3):
+    if df_counts is not None and df_info is not None and var1 is not None and var2 is not None and var3 is not None:
+        return 'check', {'display': 'none'}, {'display': 'inline-block'}
+    else:
+        raise PreventUpdate
+
+@app.callback(Output('checkmark_counts_div', 'style'),
+              Input('df_counts', 'data'))
+def update_checkmark(df_counts):
+    if df_counts is None:
+        raise PreventUpdate
+    else:
+        return {'display':'inline-block'}
+
+
+@app.callback(Output('checkmark_info_div', 'style'),
+              Input('df_info', 'data'))
+def update_checkmark(df_counts):
+    if df_counts is None:
+        raise PreventUpdate
+    else:
+        return {'display':'flex'}#{'display':'inline-block'}
+
+
 @app.callback(Output('df_counts', 'data'),
               Output('alert_import', 'value'),
+              Output('alert_import_div', 'style'),
               Input('upload-data', 'contents'),
               State('upload-data', 'filename'),
               State('upload-data', 'last_modified'))
@@ -306,21 +238,20 @@ def update_output(contents, filename, date):
     content_type, content_string = contents.split(',')
     decoded = base64.b64decode(content_string)
 
-    if 'csv' in filename:
+    if filename.endswith('csv'):
         sep=','
-    elif 'tab' in filename:
+    elif filename.endswith('tab'):
         sep = '\t'
-    elif 'tsv' in filename:
+    elif filename.endswith('tsv'):
         sep = '\t'
     else:
-        return pd.DataFrame(), 'File name extension not recongized, accepted extensions are csv, tab, tsv'
+        return pd.DataFrame().to_json(), 'File name extension not recongized, accepted extensions are csv, tab, tsv', {'display': 'inline-block'}
 
     df = pd.read_csv(io.StringIO(decoded.decode('utf-8')), sep=sep, index_col=0)
-    #print(df)
-    return df.to_json(date_format='iso', orient='split'), ''
+
+    return df.to_json(date_format='iso', orient='split'), '', {'display': 'none'}
 
 @app.callback(Output('df_info', 'data'),
-              Output('alert_import_info', 'value'),
               Input('upload-data-info', 'contents'),
               State('upload-data-info', 'filename'),
               State('upload-data-info', 'last_modified'))
@@ -338,11 +269,10 @@ def update_output(contents, filename, date):
     elif 'tsv' in filename:
         sep = '\t'
     else:
-        return pd.DataFrame(), 'File extension not recongized, accepted extensions are csv, tab, tsv'
+        return pd.DataFrame().to_json
 
     df = pd.read_csv(io.StringIO(decoded.decode('utf-8')), sep=sep, index_col=0)
-    print(df)
-    return df.to_json(date_format='iso', orient='split'), ''
+    return df.to_json(date_format='iso', orient='split')
 
 
 
@@ -374,9 +304,11 @@ def switch_tab(at):
         return dcc.Graph(id='Enrichr_kegg_dn')
     return html.P("This shouldn't ever be displayed...")
 
+
+
 @app.callback(
     Output('dataset_name_placeholder', 'children'),
-    Input('btn-save_dataset', 'n_clicks_timestamp'),
+    Input('btn_save_dataset', 'n_clicks_timestamp'),
     State('selected_data', 'children'),
     State('save_dataset_name', 'value'))
 def save_dataset(n_clicks, selected_data, dataset_name):
@@ -440,8 +372,60 @@ def exclude_helper(exclude, verbose=0):
     return [json.dumps(exclude)]
 
 
+#   html.Div(id='varaible_selection_div', children=[
+#        html.Div([
+#            html.P('Select Tissue column'),
+#            dcc.Dropdown(id='varable_selection_div')
+#        ]),
+
+@app.callback(Output('variable_selection1', 'options'),
+             Input('df_info', 'data'))
+def select_var(df_info):
+
+    if df_info is not None:
+        df_info = pd.read_json(df_info, orient='split')
+        ret = [{'label': j, 'value': j} for j in df_info.columns.to_list()]
+        return ret
+
+@app.callback(Output('variable_selection2', 'options'),
+             Input('df_info', 'data'))
+def select_var(df_info):
+
+    if df_info is not None:
+        df_info = pd.read_json(df_info, orient='split')
+        ret = [{'label': j, 'value': j} for j in df_info.columns.to_list()]
+        return ret
+
+@app.callback(Output('variable_selection3', 'options'),
+             Input('df_info', 'data'))
+def select_var(df_info):
+
+    if df_info is not None:
+        df_info = pd.read_json(df_info, orient='split')
+        ret = [{'label': j, 'value': j} for j in df_info.columns.to_list()]
+        return ret
+
+@app.callback(Output('variable_selected_dropdown', 'options'),
+             Input('variable_selection3', 'value'))
+def select_var1(variable1_value):
+    if df_info is None:
+        raise PreventUpdate
+    else:
+        ret = [{'label': j, 'value': j} for j in df_info[variable1_value].unique()]
+        print(ret)
+        return ret
+
+
+@app.callback(Output('varaible_selection_div', 'style'),
+             Input('df_info', 'data'))
+def select_var_div(df_info):
+    if df_info is None:
+        raise PreventUpdate
+    else:
+        return {'display':'inline-block'}
+
 @app.callback([Output('exclude', 'value'),
-              Output('batch_dropdown', 'value'),
+              Output('variable_selection3', 'value'),
                Output('tissue_dropdown', 'value'),
                Output('type_dropdown', 'value')],
               [Input('paper', 'value')],
@@ -455,7 +439,7 @@ def select_helper(paper, data, df_info,verbose=0):
         if paper == 'New':
             lSamples = []
             lExclude = []
-            #df_info_temp = df_info
+            df_info_temp = df_info
             lBatch = []
             lTissue = []
             lType = []
@@ -540,7 +524,7 @@ def export_plot(n_clicks, indata, prefixes):
     [Output('selected_data', 'children'),
     Output('alert_selection', 'hide')],
     [Input('exclude', 'value'),
-    Input('batch_dropdown', 'value'),
+    Input('variable_selection3', 'value'),
     Input('tissue_dropdown', 'value'),
     Input('type_dropdown', 'value'),
     Input('transformation', 'value'),],
