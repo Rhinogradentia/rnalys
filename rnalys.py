@@ -69,8 +69,14 @@ app = dash.Dash(
 
 url_bar_and_content_div = html.Div([
     dcc.Location(id='url', refresh=False),
+
+    #Data shared between pages
     dcc.Store(id='df_counts'),#, storage_type='session'),
     dcc.Store(id='df_info'),# storage_type='session'),
+    dcc.Store(id='variable_selection1_store'),
+    dcc.Store(id='variable_selection2_store'),
+    dcc.Store(id='variable_selection3_store'),
+
     html.Div(id='page-content')
 ])
 
@@ -380,41 +386,96 @@ def exclude_helper(exclude, verbose=0):
 
 @app.callback(Output('variable_selection1', 'options'),
              Input('df_info', 'data'))
-def select_var(df_info):
-
+def select_var1(df_info):
     if df_info is not None:
         df_info = pd.read_json(df_info, orient='split')
         ret = [{'label': j, 'value': j} for j in df_info.columns.to_list()]
         return ret
+
+@app.callback(Output('variable_selection1_store', 'data'),
+             Input('variable_selection1', 'value'))
+def select_var1_page1(variable1_value):
+    if variable1_value is None:
+        raise PreventUpdate
+    else:
+        print('variable1_value', variable1_value)
+        return variable1_value
+
+
+@app.callback(Output('variable1_selected_dropdown', 'options'),
+             Input('df_info', 'data'),
+             Input('variable_selection1_store', 'data'))
+def select_var1(df_info, variable1_value):
+    if variable1_value is None:
+        raise PreventUpdate
+    else:
+        df_info = pd.read_json(df_info, orient='split')
+        ret = [{'label': j, 'value': j} for j in df_info[str(variable1_value)].unique()]
+        filtered_data = [item for item in ret if item["label"] is not None and item["value"] is not None]
+        return filtered_data
 
 @app.callback(Output('variable_selection2', 'options'),
              Input('df_info', 'data'))
-def select_var(df_info):
+def select_var2(df_info):
 
     if df_info is not None:
         df_info = pd.read_json(df_info, orient='split')
         ret = [{'label': j, 'value': j} for j in df_info.columns.to_list()]
         return ret
+
+@app.callback(Output('variable_selection2_store', 'data'),
+             Input('variable_selection2', 'value'))
+def select_var2_page2(variable2_value):
+    if variable2_value is None:
+        raise PreventUpdate
+    else:
+        print('variable2_value', variable2_value)
+        return variable2_value
+
+
+@app.callback(Output('variable2_selected_dropdown', 'options'),
+             Input('df_info', 'data'),
+             Input('variable_selection2_store', 'data'))
+def select_var2(df_info, variable2_value):
+    if variable2_value is None:
+        raise PreventUpdate
+    else:
+        df_info = pd.read_json(df_info, orient='split')
+        ret = [{'label': j, 'value': j} for j in df_info[str(variable2_value)].unique()]
+        filtered_data = [item for item in ret if item["label"] is not None and item["value"] is not None]
+        return filtered_data
+
 
 @app.callback(Output('variable_selection3', 'options'),
              Input('df_info', 'data'))
-def select_var(df_info):
-
+def select_var3(df_info):
     if df_info is not None:
         df_info = pd.read_json(df_info, orient='split')
         ret = [{'label': j, 'value': j} for j in df_info.columns.to_list()]
         return ret
 
-@app.callback(Output('variable_selected_dropdown', 'options'),
-             Input('variable_selection3', 'value'))
-def select_var1(variable1_value):
-    if df_info is None:
+@app.callback(Output('variable3_selected_dropdown', 'options'),
+             Input('df_info', 'data'),
+             Input('variable_selection3_store', 'data'))
+def select_var1(df_info, variable3_value):
+    if variable3_value is None:
         raise PreventUpdate
     else:
-        ret = [{'label': j, 'value': j} for j in df_info[variable1_value].unique()]
-        print(ret)
-        return ret
+        df_info = pd.read_json(df_info, orient='split')
+        ret = [{'label': j, 'value': j} for j in df_info[str(variable3_value)].unique()]
+        filtered_data = [item for item in ret if item["label"] is not None and item["value"] is not None]
+        return filtered_data
 
+#variable_selection3
+
+@app.callback(Output('variable_selection3_store', 'data'),
+             Input('variable_selection3', 'value'))
+def select_var3_page1(variable3_value):
+    if variable3_value is None:
+        raise PreventUpdate
+    else:
+        print('variable3_value', variable3_value)
+        return variable3_value
 
 @app.callback(Output('varaible_selection_div', 'style'),
              Input('df_info', 'data'))
@@ -425,9 +486,9 @@ def select_var_div(df_info):
         return {'display':'inline-block'}
 
 @app.callback([Output('exclude', 'value'),
-              Output('variable_selection3', 'value'),
-               Output('tissue_dropdown', 'value'),
-               Output('type_dropdown', 'value')],
+              Output('variable3_selected_dropdown', 'value'),
+               Output('variable1_selected_dropdown', 'value'),
+               Output('variable1_selected_dropdown', 'value')],
               [Input('paper', 'value')],
               [State('exclude_list', 'children'),
                State('df_info', 'data')])
@@ -524,33 +585,43 @@ def export_plot(n_clicks, indata, prefixes):
     [Output('selected_data', 'children'),
     Output('alert_selection', 'hide')],
     [Input('exclude', 'value'),
-    Input('variable_selection3', 'value'),
-    Input('tissue_dropdown', 'value'),
-    Input('type_dropdown', 'value'),
-    Input('transformation', 'value'),],
+    Input('variable_selection3_store', 'data'),
+    Input('variable_selection1_store', 'data'),
+    Input('variable_selection2_store', 'data'),
+    Input('transformation', 'value'),
+    Input('variable3_selected_dropdown', 'value'),
+    Input('variable1_selected_dropdown', 'value'),
+    Input('variable2_selected_dropdown', 'value')],
     [State('df_info', 'data')],
     prevent_initial_call=True)
-def select_info(lExclude, batch_dropdown,  tissue_dropdown, type_dropdown, transformation, df_info):
-
+def select_info(lExclude, batch_dropdown,  tissue_dropdown, type_dropdown, transformation, variable3, variable1, variable2, df_info):
+    #variable_selection1_store = column_name_variable1 = tissue
+    #variable1 = LV RV etc
     if batch_dropdown is not None and tissue_dropdown is not None and type_dropdown is not None and transformation is not None:
 
         df_info = pd.read_json(df_info, orient='split')
 
+        '''
         if 'LVRV' in tissue_dropdown:
             tissue_dropdown = tissue_dropdown + ['LV', 'RV']
         if 'EFSF' in tissue_dropdown:
             tissue_dropdown = tissue_dropdown + ['EF', 'SF']
         if 'HF' in type_dropdown:
             type_dropdown = type_dropdown + ['HFrEF', 'HFPEF']
+        '''
+
 
         if transformation =='Sizefactor normalization':
             transformation = 'None'
         else:
             transformation = transformation
 
-        df_info_temp = df_info.loc[df_info['SeqTag'].isin(batch_dropdown),]
-        df_info_temp = df_info_temp.loc[df_info_temp['tissue'].isin(tissue_dropdown),]
-        df_info_temp = df_info_temp.loc[df_info_temp['type'].isin(type_dropdown), ]
+        df_info_temp = df_info.loc[df_info[batch_dropdown].isin(variable3),]
+        #df_info_temp = df_info.loc[df_info['SeqTag'].isin(batch_dropdown),]
+        #df_info_temp = df_info_temp.loc[df_info_temp['tissue'].isin(tissue_dropdown),]
+        df_info_temp = df_info_temp.loc[df_info_temp[tissue_dropdown].isin(variable1),]
+        #df_info_temp = df_info_temp.loc[df_info_temp['type'].isin(type_dropdown), ]
+        df_info_temp = df_info_temp.loc[df_info_temp[type_dropdown].isin(variable2),]
 
         if lExclude is not None:
             df_info_temp = df_info_temp.loc[~df_info_temp['id_tissue'].isin(lExclude), ]
@@ -696,7 +767,7 @@ def add_de_set(btn_add, btn_clear, indata_de, detable_comp, indata):
     State('rm_confounding', 'value'),
     State('full_text', 'value'),
     State('force_run', 'value'),
-    State('tissue_dropdown', 'value'),
+    State('variable1_selected_dropdown', 'value'),
     State('df_counts', 'data'),
     State('df_info', 'data'),
     prevent_initial_call=True,)

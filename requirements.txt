@@ -1,0 +1,4 @@
+pandas
+dash-bootstrap-components
+dash_mantine_components
+dash-bio

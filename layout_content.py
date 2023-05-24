@@ -143,9 +143,9 @@ layout_page1 = html.Div(
 
                         html.Div([
                             dcc.Dropdown(
-                                id='type_dropdown',
-                                options=[{'label': j, 'value': j} for j in df_meta_combined['type'].unique().tolist() + ['HF']],
-                                value=[''],
+                                id='variable1_selected_dropdown',
+                                #options=[{'label': j, 'value': j} for j in df_meta_combined['type'].unique().tolist() + ['HF']],
+                                #value=[''],
                                 multi=True,
                             )
                         ], style={'display': 'inline-block', 'width':'100%', 'verticalAlign':"middle"})
@@ -155,17 +155,17 @@ layout_page1 = html.Div(
                         html.P('Tissue:',style={'width': '10%', 'display': 'flex', 'verticalAlign':"middle", 'padding':'5px'}),
                         html.Div([
                             dcc.Dropdown(
-                            id='tissue_dropdown',
-                            options=[
-                                {'label': 'Left Ventricle', 'value': 'LV'},
-                                {'label': 'Right Ventricle', 'value': 'RV'},
-                                {'label': 'Right atrial', 'value': 'RAA'},
-                                {'label': 'Muscle', 'value': 'musc'},
-                                {'label': 'EpiFat', 'value': 'EF'},
-                                {'label': 'SubFat', 'value': 'SF'},
-                                {'label': 'LV+RV', 'value': 'LVRV'},
-                                {'label': 'EF+SF', 'value': 'EFSF'}
-                            ],
+                            id='variable1_selected_dropdown',
+                            #options=[
+                            #    {'label': 'Left Ventricle', 'value': 'LV'},
+                            #    {'label': 'Right Ventricle', 'value': 'RV'},
+                            #    {'label': 'Right atrial', 'value': 'RAA'},
+                            #    {'label': 'Muscle', 'value': 'musc'},
+                            #    {'label': 'EpiFat', 'value': 'EF'},
+                            #    {'label': 'SubFat', 'value': 'SF'},
+                            #    {'label': 'LV+RV', 'value': 'LVRV'},
+                            #    {'label': 'EF+SF', 'value': 'EFSF'}
+                            #],
                             value=[''],
                             multi=True)
                         ], style={'display': 'inline-block', 'width':'100%', 'verticalAlign':"middle"})
@@ -175,7 +175,7 @@ layout_page1 = html.Div(
                         html.P('Batch:', style={'width': '10%', 'display': 'flex', 'verticalAlign':"middle", 'padding':'5px'}),
                         html.Div([
                             dcc.Dropdown(
-                            id='variable_selected_dropdown',
+                            id='variable3_selected_dropdown',
                             #options=[{'label': j, 'value': j} for j in df_meta_combined['SeqTag'].unique()],
                             multi=True)
                         ], style={'display': 'inline-block', 'width':'100%', 'verticalAlign':"middle"})
@@ -763,7 +763,7 @@ layout_index = html.Div([
         ], style={'display': 'flex', 'verticalAlign': "middle", 'width': '100%'}),
 
         html.Div([
-            html.P('Select Tissue column',
+            html.P('Select batch column',
                    style={'width': '250px', 'display': 'flex', 'verticalAlign': "middle", 'padding': '2px'}),
             dcc.Dropdown(id='variable_selection3', style={'width': '250px', 'display': 'inline-block'}),
         ], style={'display': 'flex', 'verticalAlign': "middle", 'width': '100%'}),
