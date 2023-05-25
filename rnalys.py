@@ -24,38 +24,7 @@ from collections import Counter
 from dash.exceptions import PreventUpdate
 from sklearn.decomposition import PCA
 from demos import dash_reusable_components as drc
-
 from layout_content import layout_index, layout_page1
-
-
-
-
-'''
-New in version 8:
-    Include wgcna analysis v.0.1
-    
-Version 9
-    added smooth quantile normalization and limma voom DE analysis
-
-Version 10
-    added cytoscape page with enricher and network analysis
-
-Version 11
-    added paired sample alternative in design (only works for tissue atm)
-    
-Version 13 
-    add design formula
-    removed paired sample
-
-version 15
-    remove cytoscape
-
-version 16
-    front-end changes
-    cleaned up
-    
-'''
-
 
 # external_stylesheets = ["https://codepen.io/chriddyp/pen/bWLwgP.css"]
 
@@ -77,6 +46,12 @@ url_bar_and_content_div = html.Div([
     dcc.Store(id='variable_selection2_store'),
     dcc.Store(id='variable_selection3_store'),
 
+    #Spliting dataframes to speed up for referencing
+    dcc.Store(id='counts_index_store'),
+    dcc.Store(id='counts_columns_store'),
+    dcc.Store(id='info_columns_store'),
+    dcc.Store(id='info_index_store'),
+
     html.Div(id='page-content')
 ])
 
@@ -89,13 +64,10 @@ df_symbol.index = df_symbol['ensembl_gene_id']
 df_symbol = df_symbol.loc[~df_symbol.index.duplicated(keep='first')]
 df_symbol_sym_ind = df_symbol.copy()
 df_symbol_sym_ind.index = df_symbol_sym_ind['hgnc_symbol']
-
 df_symbol['hgnc_symbol'].fillna(df_symbol['ensembl_gene_id'], inplace=True)
-
-
 dTranslate = dict(df_symbol['hgnc_symbol'])
-
 dups = [k for k, v in Counter(df_symbol['hgnc_symbol'].tolist()).items() if v > 1]
+
 for k, v in dTranslate.items():
     if v in dups:
         dTranslate[k] = k
@@ -121,6 +93,7 @@ columns = ['Ensembl', 'hgnc', 'baseMean', 'log2FoldChange', 'pvalue', 'padj']
 data = [['ens', 'hgnc1', 10, 4, 0.005, 0.9995]]
 df = pd.DataFrame(data, columns=columns)
 
+#Layouts
 layout_index = layout_index
 layout_page1 = layout_page1
 
@@ -143,6 +116,12 @@ class db_res:
             self.updn_dict['dn'] = indict
 
 def save_dataset_to_file(lFilename_list):
+    '''
+    Saves the selected data into datasets.txt
+
+    :param lFilename_list: containing all variables
+    '''
+
     dataset_file = open('data/datasets.txt', 'a')
     dataset_file.write(lFilename_list[0]+' '+lFilename_list[1]+ "\n")
     dataset_file.close()
@@ -208,6 +187,15 @@ def parse_contents(contents, filename, date):
             Input('variable_selection2','value'),
             Input('variable_selection3','value'))
 def update_alert_import(df_counts, df_info, var1, var2, var3):
+
+    if df_counts is not None and df_info is not None and var1 is None and var2 is None and var3 is None:
+        df_counts = pd.read_json(df_counts, orient='split')
+        df_info = pd.read_json(df_info, orient='split')
+        if list(df_counts.columns) != list(df_info.index):
+            return 'Columns in Count data does not match Rows in Info data', {'display': 'inline-block'}, {'display': 'none'}
+        else:
+            return 'check', {'display': 'none'}, {'display': 'none'}
+
     if df_counts is not None and df_info is not None and var1 is not None and var2 is not None and var3 is not None:
         return 'check', {'display': 'none'}, {'display': 'inline-block'}
     else:
@@ -234,6 +222,8 @@ def update_checkmark(df_counts):
 @app.callback(Output('df_counts', 'data'),
               Output('alert_import', 'value'),
               Output('alert_import_div', 'style'),
+              Output('counts_index_store', 'data'),
+              Output('counts_columns_store', 'data'),
               Input('upload-data', 'contents'),
               State('upload-data', 'filename'),
               State('upload-data', 'last_modified'))
@@ -251,13 +241,19 @@ def update_output(contents, filename, date):
     elif filename.endswith('tsv'):
         sep = '\t'
     else:
-        return pd.DataFrame().to_json(), 'File name extension not recongized, accepted extensions are csv, tab, tsv', {'display': 'inline-block'}
+        return pd.DataFrame().to_json(), 'File name extension not recongized, accepted extensions are csv, tab, tsv', \
+               {'display': 'inline-block'}, [], []
 
     df = pd.read_csv(io.StringIO(decoded.decode('utf-8')), sep=sep, index_col=0)
+    counts_index = list(df.index)
+    counts_columns = list(df.columns)
 
-    return df.to_json(date_format='iso', orient='split'), '', {'display': 'none'}
+    return df.to_json(date_format='iso', orient='split'), '', {'display': 'none'}, counts_index, counts_columns
+
 
 @app.callback(Output('df_info', 'data'),
+              Output('info_columns_store', 'data'),
+              Output('info_index_store', 'data'),
               Input('upload-data-info', 'contents'),
               State('upload-data-info', 'filename'),
               State('upload-data-info', 'last_modified'))
@@ -278,7 +274,10 @@ def update_output(contents, filename, date):
         return pd.DataFrame().to_json
 
     df = pd.read_csv(io.StringIO(decoded.decode('utf-8')), sep=sep, index_col=0)
-    return df.to_json(date_format='iso', orient='split')
+    info_columns = list(df.columns)
+    info_index = list(df.index)
+
+    return df.to_json(date_format='iso', orient='split'), info_columns, info_index
 
 
 
@@ -466,7 +465,6 @@ def select_var1(df_info, variable3_value):
         filtered_data = [item for item in ret if item["label"] is not None and item["value"] is not None]
         return filtered_data
 
-#variable_selection3
 
 @app.callback(Output('variable_selection3_store', 'data'),
              Input('variable_selection3', 'value'))
@@ -484,6 +482,40 @@ def select_var_div(df_info):
         raise PreventUpdate
     else:
         return {'display':'inline-block'}
+
+ #   dcc.Store(id='gene_list_store'),
+ #   dcc.Store(id='info_columns_store'),
+ #   dcc.Store(id='sample_list_info_store'),
+ #   dcc.Store(id='sample_list_counts_store'),
+
+@app.callback(Output('exclude', 'options'),
+              Output('rm_confounding', 'options'),
+              Output('meta_dropdown', 'options'),
+              Output('gene_list', 'options'),
+              #Input('df_counts', 'data'),
+              #Input('df_info', 'data'))
+              Input('counts_columns_store', 'data'),
+              Input('counts_index_store', 'data'),
+              Input('info_columns_store', 'data'))
+def exclude_dropdown(counts_columns, counts_index, info_columns):#df_counts, df_info):
+    if counts_columns is not None and counts_index is not None and info_columns is not None:
+
+        #df_counts = pd.read_json(df_counts, orient='split')
+        #df_info = pd.read_json(df_info, orient='split')
+
+        #exclude_options = [{'label': j, 'value': j} for j in df_counts.columns]
+        #gene_list = [{'label': j, 'value': j} for j in df_counts.index]
+        #df_info_columns = [{'label': j, 'value': j} for j in df_info.columns]
+
+        exclude_options = [{'label': j, 'value': j} for j in counts_columns]
+        gene_list = [{'label': j, 'value': j} for j in counts_index]
+        df_info_columns = [{'label': j, 'value': j} for j in info_columns]
+
+        return exclude_options, df_info_columns, df_info_columns, gene_list
+    else:
+        raise PreventUpdate
+
+
 
 @app.callback([Output('exclude', 'value'),
               Output('variable3_selected_dropdown', 'value'),
@@ -1007,7 +1039,7 @@ def set_biplot_options(selected):
 
 @app.callback(
     Output('hpa_graph', 'figure'),
-    [Input('input-2', 'value'),
+    [Input('gene_list', 'value'),
      Input('radio_symbol', 'value'),
      Input('input-2_hgnc', 'value')
     ])
@@ -1041,7 +1073,7 @@ def update_hpa(lgenes, input_symbol, lgenes_hgnc):
     Output('indicator-graphic2', 'figure'),
     [Input('intermediate-table', 'children'),
      Input('intermediate-DEtable', 'children'),
-     Input('input-2', 'value'),
+     Input('gene_list', 'value'),
      Input('radio_symbol', 'value'),
      Input('radio-grouping', 'value'),
      Input('input-2_hgnc', 'value')
@@ -1135,13 +1167,13 @@ def clicked_out(clickData):
     Output('pca_correlation', 'figure'),
     Input('intermediate-table', 'children'),
     Input('radio_coloring', 'value'),
-    Input('input-gene', 'value'),
+    #Input('input-gene', 'value'),
     Input('radio-text', 'value'),
     Input('num_genes', 'value'),
     Input('biplot_radio', 'value'),
     Input('biplot_text_radio', 'value'),
     Input('meta_dropdown', 'value'))
-def update_pca_and_barplot(indata, radio_coloring, input2, radio_text, number_of_genes, biplot_radio,
+def update_pca_and_barplot(indata, radio_coloring, radio_text, number_of_genes, biplot_radio,
                            biplot_text_radio, dropdown):
 
     if indata is None:
@@ -1388,7 +1420,7 @@ def export_de(n_clicks, indata, prefixes):
     State('rowsum','value'),
     State('design', 'value'),
     State('reference', 'value'))
-def run_DE_analysis(n_clicks, indata, radiode, transformation, force_run, rowsum, design, reference):
+def run_DE_analysis(n_clicks, indata, program, transformation, force_run, rowsum, design, reference):
     if n_clicks is None:
         raise PreventUpdate
     else:
@@ -1398,36 +1430,37 @@ def run_DE_analysis(n_clicks, indata, radiode, transformation, force_run, rowsum
         name_counts = json.loads(datasets['counts_raw_file_name'])
         lTotal = json.loads(datasets['prefixes'])
         sTotal = '_'.join(lTotal)
-        lTotalDE = lTotal + [radiode]
-        sTotalDE = sTotal + '_' + radiode
+        lTotalDE = lTotal + [program]
+        sTotalDE = sTotal + '_' + program
 
         name_meta = './data/generated/' + ''.join(lTotal) + '_meta.tab'
-        name_out = './data/generated/' + ''.join(lTotalDE) + '_' + transformation + '_DE.tab'
+        name_out = './data/generated/' + ''.join(lTotalDE) + '_DE.tab'
         print(sTotal)
-        if radiode == 'DESeq2':
-            # counts, meta file, transformation, rowsum, name_out
-            print(design)
-            cmd = 'Rscript ./functions/run_deseq2_v2.R %s %s %s %s %s %s %s' % (
-                name_counts, name_meta, transformation, rowsum, design, name_out, reference)
+        if program == 'DESeq2':
+            cmd = 'Rscript ./functions/run_deseq2_v2.R %s %s %s %s %s %s' % (
+                name_counts, name_meta, rowsum, design, name_out, reference)
 
-        elif radiode == 'edgeR':
-            if sTotal.count('@') > 1:
-                cmd = 'Rscript ./functions/run_edgeR.R %s %s %s %s %s' % (name_counts, name_meta, 'batch', radiode_type,
-                                                                          name_out)
-                print('edgeR batch')
-            else:
-                cmd = 'Rscript ./functions/run_edgeR.R %s %s %s %s %s' % (name_counts, name_meta, 'none', radiode_type,
-                                                                          name_out)
-                print('edgeR no batch')
+        elif program == 'edgeR':
+            cmd = 'Rscript ./functions/run_edgeR.R %s %s %s %s %s' % (name_counts, name_meta, design, reference,
+                                                                      name_out)
 
-        elif radiode == 'limma':
+            #if sTotal.count('@') > 1:
+            #    cmd = 'Rscript ./functions/run_edgeR.R %s %s %s %s %s' % (name_counts, name_meta, 'batch', reference,
+            #                                                              name_out)
+            #    print('edgeR batch')
+            #else:
+            #    cmd = 'Rscript ./functions/run_edgeR.R %s %s %s %s %s' % (name_counts, name_meta, 'none', reference,
+            #                                                              name_out)
+            #    print('edgeR no batch')
+
+        elif program == 'limma':
             if sTotal.count('@') > 1:
                 cmd = 'Rscript ./functions/run_limma_de.R %s %s %s %s %s' % (
-                name_counts, name_meta, 'batch', radiode_type,
+                name_counts, name_meta, 'batch', reference,
                 name_out)
             else:
                 cmd = 'Rscript ./functions/run_limma_de.R %s %s %s %s %s' % (
-                name_counts, name_meta, 'none', radiode_type,
+                name_counts, name_meta, 'none', reference,
                 name_out)
         else:
             print('ERROR radio_de')
@@ -1442,7 +1475,7 @@ def run_DE_analysis(n_clicks, indata, radiode, transformation, force_run, rowsum
 
         df_degenes = pd.read_csv(name_out, sep='\t')
 
-        if radiode == 'edgeR':
+        if program == 'edgeR':
             df_degenes.rename(columns={'logFC': 'log2FoldChange', 'FDR': 'padj', 'PValue': 'pvalue'}, inplace=True)
             df_degenes['Ensembl'] = df_degenes['genes']
 
@@ -1453,11 +1486,8 @@ def run_DE_analysis(n_clicks, indata, radiode, transformation, force_run, rowsum
         overlap_genes = list(set(df_degenes.index).intersection(set(df_symbol.index)))
         dTranslate = dict(df_symbol.loc[overlap_genes]['hgnc_symbol'])
 
-        #logging
-        #if
-
         df_degenes['hgnc'] = [dTranslate.get(x, x) for x in df_degenes.index]
-        datasets = {'de_table': df_degenes.to_json(orient='split'), 'DE_type': radiode, 'title': sTotalDE}
+        datasets = {'de_table': df_degenes.to_json(orient='split'), 'DE_type': program, 'title': sTotalDE}
 
         print('DE done')
         return json.dumps(datasets), 'temp', ''

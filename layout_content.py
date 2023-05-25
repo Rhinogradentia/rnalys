@@ -50,14 +50,12 @@ def b64_image(image_filename):
         image = f.read()
     return 'data:image/png;base64,' + base64.b64encode(image).decode('utf-8')
 
-#TODO set variables in index, tissue, batch, class
+#df_counts_combined_file = '/home/cfrisk/Dropbox/dash/data/df_counts_combined.tab'
+#df_counts_combined = pd.read_csv(df_counts_combined_file, sep='\t', index_col=0)
 
-df_counts_combined_file = '/home/cfrisk/Dropbox/dash/data/df_counts_combined.tab'
-df_counts_combined = pd.read_csv(df_counts_combined_file, sep='\t', index_col=0)
-
-df_meta_combined_file = '/home/cfrisk/Dropbox/dash/data/df_meta_v3.tab'
-df_meta_combined = pd.read_csv(df_meta_combined_file, sep='\t', index_col=0)
-available_tissues = df_meta_combined['tissue'].unique()
+#df_meta_combined_file = '/home/cfrisk/Dropbox/dash/data/df_meta_v3.tab'
+#df_meta_combined = pd.read_csv(df_meta_combined_file, sep='\t', index_col=0)
+#available_tissues = df_meta_combined['tissue'].unique()
 
 start_genes = ['LEP', 'ADIPOQ', 'RARRES2', 'IL6', 'CCL2', 'SERPINE1', 'RBP4', 'NAMPT', 'ITLN1', 'GRN']
 
@@ -112,25 +110,18 @@ layout_page1 = html.Div(
                     type='text',
                     placeholder='name dataset'
                 ),
-
                 html.Div([
                     dmc.Alert(
                         "-",
                         id="alert_datafiles_selection",
                         color='info',
-                        # is_open=True,
                         withCloseButton=True,
-                        # n_clicks=0,
                     ),
                 ], style={'display':'none'}),#style={'textAlign': 'left', 'width': '30%', 'margin-top': 5}),
 
                 dbc.Button('Save', id='btn_save_dataset', n_clicks=0),
                 html.Div(id='name_dataset_save'),
-
-
             ], style={'width': '30%', 'display': 'inline-block', 'padding':'5px'}),
-
-
         ]),
 
         html.P(id='dataset_name_placeholder'),
@@ -140,7 +131,7 @@ layout_page1 = html.Div(
                     html.H3('Select samples', style={'textAlign': 'left', 'padding': '5px'}),
 
                     html.Div([
-                        html.P('Type:', style={'width': '10%', 'display': 'flex', 'verticalAlign':"middle", 'padding':'5px'}),
+                        html.P('Type:', style={'width': '80px', 'display': 'flex', 'verticalAlign':"middle", 'padding':'5px'}),
 
                         html.Div([
                             dcc.Dropdown(
@@ -153,7 +144,7 @@ layout_page1 = html.Div(
                     ], style={'display': 'flex', 'verticalAlign':"middle", 'width': '80%'}),
 
                     html.Div([
-                        html.P('Tissue:',style={'width': '10%', 'display': 'flex', 'verticalAlign':"middle", 'padding':'5px'}),
+                        html.P('Tissue:',style={'width': '80px', 'display': 'flex', 'verticalAlign':"middle", 'padding':'5px'}),
                         html.Div([
                             dcc.Dropdown(
                             id='variable1_selected_dropdown',
@@ -173,7 +164,7 @@ layout_page1 = html.Div(
                     ], style={'display': 'flex', 'verticalAlign':"middle", 'width': '80%'}),
                     #
                     html.Div([
-                        html.P('Batch:', style={'width': '10%', 'display': 'flex', 'verticalAlign':"middle", 'padding':'5px'}),
+                        html.P('Batch:', style={'width': '80px', 'display': 'flex', 'verticalAlign':"middle", 'padding':'5px'}),
                         html.Div([
                             dcc.Dropdown(
                             id='variable3_selected_dropdown',
@@ -184,11 +175,11 @@ layout_page1 = html.Div(
 
                     html.Div([
                         html.Div(id='exclude_list', style={'display': 'none'}),
-                        html.P('Exclude:', style={'margin-right': '10px'}),
+                        html.P('Exclude:', style={'width': '80px', 'display': 'flex', 'verticalAlign':"middle", 'padding':'5px'}),
                         html.Div([
                             dcc.Dropdown(
                                 id='exclude',
-                                options=[{'label': j, 'value': j} for j in df_counts_combined.columns],
+                                #options=[{'label': j, 'value': j} for j in df_counts_combined.columns],
                                 multi=True,
                                 placeholder='Select Samples to exclude',
 
@@ -225,7 +216,7 @@ layout_page1 = html.Div(
                             html.Div([
                                 dcc.Dropdown(
                                     id='rm_confounding',
-                                    options=[{'label': j, 'value': j} for j in df_meta_combined.columns],
+                                    #options=[{'label': j, 'value': j} for j in df_meta_combined.columns],
                                     multi=False,
                                     value=None)
                             ], style={'display': 'inline-block', 'width': '100%', 'verticalAlign': "middle"})
@@ -284,145 +275,147 @@ layout_page1 = html.Div(
         html.Br(),
         html.Div([
             html.Div([
-                html.P('Select gene'),
-
-                html.Div(id='Select_gene_input'),
                 html.Div([
-                    html.Div([html.P('Ensembl:')], style={'width': '5%', 'display': 'inline-block'}),
-                    html.Div([dcc.Dropdown(id='input-2',
-                                 options=[{'label': j, 'value': j} for j in df_counts_combined.index], multi=True,
-                                 value=['ENSG00000232810'])],
-                                 style={'width': '70%', 'display': 'inline-block', 'verticalAlign': "middle"})
-                ]),
+                    html.H3('Explore genes', style={'textAlign': 'left', 'padding': '5px', 'margin-top': 5}),
+
+                    html.Div(id='Select_gene_input'),
+                    html.Div([
+                        html.Div([html.P('Ensembl:')], style={'width': '5%', 'display': 'inline-block'}),
+                        html.Div([dcc.Dropdown(id='gene_list',#'input-2',
+                                     #options=[{'label': j, 'value': j} for j in df_counts_combined.index]
+                                     multi=True,
+                                     value=['ENSG00000232810'])],
+                                     style={'width': '70%', 'display': 'inline-block', 'verticalAlign': "middle"})
+                    ], style={'margin-top': 10}),
+
+                    html.Div([
+                        html.Div([html.P('hgnc:')], style={'width': '5%', 'display': 'inline-block'}),
+                        html.Div([dcc.Dropdown(id='input-2_hgnc', options=[{'label': j, 'value': j} for j in hgnc_dropdown],
+                                     multi=True, value=start_genes)],style={'width': '70%', 'display': 'inline-block', 'verticalAlign':"middle"})
+                    ]),
+                ], style={'display': 'inline-block', 'width':'70%', 'verticalAlign':"middle"}),
+
+
+
 
                 html.Div([
-                    html.Div([html.P('hgnc:')], style={'width': '5%', 'display': 'inline-block'}),
-                    html.Div([dcc.Dropdown(id='input-2_hgnc', options=[{'label': j, 'value': j} for j in hgnc_dropdown],
-                                 multi=True, value=start_genes)],style={'width': '70%', 'display': 'inline-block', 'verticalAlign':"middle"})
-                ]),
-            ], style={'display': 'inline-block', 'width':'70%', 'verticalAlign':"middle"}),
 
+                    html.Div([
+                        html.H4('Display options'),
 
+                        html.Div([
+                            dcc.RadioItems(id='radio_symbol',
+                                           options=[{'label': j, 'value': j} for j in ['Ensembl', 'Symbol']],
+                                           value='Ensembl', labelStyle={'display': 'inline-block'}),
+                        ]),
+                        html.Div([
+                            dcc.RadioItems(id='radio-grouping',
+                                           options=[
+                                               {'label': 'Tissue', 'value': 'tissue'},
+                                               {'label': 'Type', 'value': 'type'},
+                                               {'label': 'Batch', 'value': 'SeqTag'},
+                                           ],
+                                           value='tissue', labelStyle={'display': 'inline-block'}),
+                        ]),
 
+                        dcc.Checklist(id='full_text',
+                                      options=[
+                                          {'label': 'Full text', 'value': 'fulltext'},
+                                      ], labelClassName='Full text'),
 
+                    ], style={'verticalAlign':"middle"}
+
+                    ),
+
+                ], style={'margin-top': 10, 'border':
+                    '1px solid #C6CCD5', 'padding': 5,
+                          'border-radius': '5px', 'display':'inline-block', 'width': '30%', 'verticalAlign':"middle"}
+                ),
+            ], className='row', style={'width': '100%','display': 'inline-block', 'verticalAlign':"middle"}),
+
+            html.Div(id='log2_table', style={'display': 'none'}),
+
+            #TABS
             html.Div([
+                    dbc.Tabs(
+                        [
+                            dbc.Tab(label="Gene Expression", tab_id="tab-1"),
+                            dbc.Tab(label="Human protein atlas", tab_id="tab-2"),
+                        ],
+                        id="tabs",
+                        active_tab="tab-1",
+                    ),
+                    html.Div(id="content"),
+            ], style={'margin-top': 5}),
 
-                html.Div([
-                    html.P('Display options'),
+            #dcc.Graph(id='indicator-graphic2'),
+            #dcc.Graph(id='hpa_graph'),
+            #dash_table.DataTable(id='gene_table',
+            #                     columns=[
+            #                         {"name": i, "id": i} for i in sorted(df_symbol.columns)
+            #                     ]),
 
-                    html.Div([
-                        dcc.RadioItems(id='radio_symbol',
-                                       options=[{'label': j, 'value': j} for j in ['Ensembl', 'Symbol']],
-                                       value='Ensembl', labelStyle={'display': 'inline-block'}),
-                    ]),
-                    html.Div([
-                        dcc.RadioItems(id='radio-grouping',
-                                       options=[
-                                           {'label': 'Tissue', 'value': 'tissue'},
-                                           {'label': 'Type', 'value': 'type'},
-                                           {'label': 'Batch', 'value': 'SeqTag'},
-                                       ],
-                                       value='tissue', labelStyle={'display': 'inline-block'}),
-                    ]),
-
-                    dcc.Checklist(id='full_text',
-                                  options=[
-                                      {'label': 'Full text', 'value': 'fulltext'},
-                                  ], labelClassName='Full text'),
-
-                ], style={'verticalAlign':"middle"}
-
-                ),
-
-            ], style={'margin-top': 10, 'border':
-                '1px solid #C6CCD5', 'padding': 5,
-                      'border-radius': '5px', 'display':'inline-block', 'width': '30%', 'verticalAlign':"middle"}
-            ),
-        ], className='row', style={'width': '100%','display': 'inline-block', 'verticalAlign':"middle"}),
-
-        html.Div(id='log2_table', style={'display': 'none'}),
-
-        #TABS
-        html.Div([
-                dbc.Tabs(
-                    [
-                        dbc.Tab(label="Gene Expression", tab_id="tab-1"),
-                        dbc.Tab(label="Human protein atlas", tab_id="tab-2"),
-                    ],
-                    id="tabs",
-                    active_tab="tab-1",
-                ),
-                html.Div(id="content"),
-        ]),
-
-        #dcc.Graph(id='indicator-graphic2'),
-        #dcc.Graph(id='hpa_graph'),
-        #dash_table.DataTable(id='gene_table',
-        #                     columns=[
-        #                         {"name": i, "id": i} for i in sorted(df_symbol.columns)
-        #                     ]),
+        ],  className='row', style={'display': 'flex', 'margin': 'auto', 'border': '1px solid #C6CCD5', 'padding': '20px', 'border-radius': '5px','justify-content': 'space-between', 'margin-top': 5, 'padding': 5}),
 
         html.Br(),
-        html.Div([html.H2('PCA analysis')], style={"textAlign": "left"}),
-
-
-        dbc.Input(id='input-gene', type='text', placeholder='Insert Gene (Ensembl)'),
-        dbc.Input(id='num_genes', type='text', placeholder='# genes'),
-
         html.Div([
-            dcc.Dropdown(
-                id='meta_dropdown',
-                options=[{'label': j, 'value': j} for j in df_meta_combined.columns],
-                value='tissue'
-            ),
-        ], style={'width':'60%'}),
-
-        dcc.RadioItems(id='radio_coloring', options=[{'label': j, 'value': j} for j in ['tissue', 'type', 'batch',
-                                                                                        'Sex', 'gene-level']],
-                       value='tissue', labelStyle={'display': 'inline-block'}),
-
-        dcc.RadioItems(id='radio-text', options=[{'label': j, 'value': j} for j in ['None', 'Text']], value='None',
-                       labelStyle={'display': 'inline-block'}, labelClassName='Scatter Text'),
-
-        dcc.Checklist(
-            id='biplot_radio',
-            options=[{'label': 'Biplot', 'value': 'biplot'}],
-        ),
-
-        dcc.RadioItems(id='biplot_text_radio'),
+            html.Div([html.H2('PCA analysis')], style={"textAlign": "left"}),
 
 
-        html.Div(children=[
-
-                          dcc.Graph(id='pca_and_barplot', style={'display': 'inline-block', 'width':'50%'}),
-                          dcc.Graph(id='barplot', style={'display': 'inline-block', 'width':'50%'})
-            ]),
-
-        html.Div(children=[
-
-            dcc.Graph(id='pca-graph', style={'display': 'inline-block', 'width': '50%'}),
-            dcc.Graph(id='pca_comp_explained', style={'display': 'inline-block', 'width': '50%'})
-        ]),
-
-        html.Div(id='clicked'),
-
-        html.Div([
-            html.Div([dcc.Graph(id='clustergram')]),
-            html.Div([dcc.Graph(id='pca_correlation')]),
-        ]),
-
-
-
-
-
-        html.Div([
-            html.H3('DE analysis'),
+            #dbc.Input(id='input-gene', type='text', placeholder='Insert Gene (Ensembl)'),
+            dbc.Input(id='num_genes', type='text', placeholder='# genes'),
 
             html.Div([
-                html.P('Settings'),
+                dcc.Dropdown(
+                    id='meta_dropdown',
+                    #options=[{'label': j, 'value': j} for j in df_meta_combined.columns],
+                    value='tissue'
+                ),
+            ], style={'width':'60%'}),
+
+            dcc.RadioItems(id='radio_coloring', options=[{'label': j, 'value': j} for j in ['tissue', 'type', 'batch',
+                                                                                            'Sex', 'gene-level']],
+                           value='tissue', labelStyle={'display': 'inline-block'}),
+
+            dcc.RadioItems(id='radio-text', options=[{'label': j, 'value': j} for j in ['None', 'Text']], value='None',
+                           labelStyle={'display': 'inline-block'}, labelClassName='Scatter Text'),
+
+            dcc.Checklist(
+                id='biplot_radio',
+                options=[{'label': 'Biplot', 'value': 'biplot'}],
+            ),
+
+            dcc.RadioItems(id='biplot_text_radio'),
 
 
+            html.Div(children=[
 
+                              dcc.Graph(id='pca_and_barplot', style={'display': 'inline-block', 'width':'50%'}),
+                              dcc.Graph(id='barplot', style={'display': 'inline-block', 'width':'50%'})
+                ]),
+
+            html.Div(children=[
+
+                dcc.Graph(id='pca-graph', style={'display': 'inline-block', 'width': '50%'}),
+                dcc.Graph(id='pca_comp_explained', style={'display': 'inline-block', 'width': '50%'})
+            ]),
+
+            html.Div(id='clicked'),
+
+            html.Div([
+                html.H4('PC correlation to variables')
+            ]),
+            html.Div([
+                #html.Div([dcc.Graph(id='clustergram')]),
+                html.Div([dcc.Graph(id='pca_correlation')]),
+            ]),
+
+        ], className='row', style={'display': 'flex', 'margin': 'auto', 'border': '1px solid #C6CCD5', 'padding': '20px', 'border-radius': '5px','justify-content': 'space-between', 'margin-top': 5, 'padding': 5}),
+
+        html.Br(),
+        html.Div([
+            html.Div([
+                html.H3('DE analysis'),
                 html.Div([
                     #dcc.RadioItems(id='radio-de', options=[{'label': j, 'value': j} for j in ['DESeq2', 'edgeR', 'limma']],
                     #       value='DESeq2',
@@ -441,9 +434,6 @@ layout_page1 = html.Div(
                             )
                         ], style = {'display': 'inline-block', 'width': '20%', 'verticalAlign': "middle"})
                     ], style = {'display': 'flex', 'verticalAlign': "middle", 'width': '80%'}),
-
-
-
 
                     html.Div([
                         html.P('Rowsum:',
@@ -496,6 +486,7 @@ layout_page1 = html.Div(
                         )], style={'width': '20%', 'display': 'inline-block', 'verticalAlign': "middle"}),
                     ], style={'width': '50%', 'display': 'flex', 'verticalAlign': "middle"}),
                 ]),
+
                 html.Div(
                 [
                     #html.Div([
@@ -524,93 +515,95 @@ layout_page1 = html.Div(
             html.Div(id='intermediate-DEtable', style={'display': 'none'}),
             html.Div(id='temp', style={'display': 'none'}),
             html.Div(id='pvalue', style={'display': 'none'}),
-        ]),
 
-        html.Div(id='export_plot_clicked'),
 
-        html.Div([
-            'Effect sizes',
-            dcc.RangeSlider(
-                id='volcanoplot-input',
-                min=-8,
-                max=8,
-                step=0.05,
-                marks={
-                    i: {'label': str(i)} for i in range(-8, 8)
-                },
-                value=[-1, 1]
-            ),
-            html.Br(),
-            html.Div(
-                dcc.Graph(
-                    id='volcanoplot',
-                    figure=dashbio.VolcanoPlot(effect_size='log2FoldChange', p='padj', gene='Ensembl',
-                                               logp=True, snp='Ensembl', xlabel='log2FoldChange',
-                                               genomewideline_value=2.5, dataframe=df
+            html.Div(id='export_plot_clicked'),
+
+            html.Div([
+                'Effect sizes',
+                dcc.RangeSlider(
+                    id='volcanoplot-input',
+                    min=-8,
+                    max=8,
+                    step=0.05,
+                    marks={
+                        i: {'label': str(i)} for i in range(-8, 8)
+                    },
+                    value=[-1, 1]
+                ),
+                html.Br(),
+                html.Div(
+                    dcc.Graph(
+                        id='volcanoplot',
+                        figure=dashbio.VolcanoPlot(effect_size='log2FoldChange', p='padj', gene='Ensembl',
+                                                   logp=True, snp='Ensembl', xlabel='log2FoldChange',
+                                                   genomewideline_value=2.5, dataframe=df
+                        )
                     )
                 )
-            )
-        ]),
-        html.Div(id='number_of_degenes'),
-        html.Div([
+            ]),
 
 
+            html.Div(id='number_of_degenes'),
             html.Div([
-                html.P('Filter on significance:',
-                       style={'width': '15%', 'display': 'flex', 'verticalAlign': "middle", 'padding': '5px'}),
+
+
                 html.Div([
-                    dbc.Input(id='toggle_sig', type='text', value='0.05',
-                              placeholder='Select p-value')
-                ], style={'display': 'inline-block', 'width': '20%', 'verticalAlign': "middle"})
-            ], style={'display': 'flex', 'verticalAlign': "middle", 'width': '80%'}),
-
-            html.Div([
-                html.P('Basemean',
+                    html.P('Filter on significance:',
                            style={'width': '15%', 'display': 'flex', 'verticalAlign': "middle", 'padding': '5px'}),
+                    html.Div([
+                        dbc.Input(id='toggle_sig', type='text', value='0.05',
+                                  placeholder='Select p-value')
+                    ], style={'display': 'inline-block', 'width': '20%', 'verticalAlign': "middle"})
+                ], style={'display': 'flex', 'verticalAlign': "middle", 'width': '80%'}),
+
                 html.Div([
-                    dbc.Input(id='toggle_basemean', type='text', value='0',
-                              placeholder='basemean')
-                ], style={'display': 'inline-block', 'width': '20%', 'verticalAlign': "middle"})
-            ], style={'display': 'flex', 'verticalAlign': "middle", 'width': '80%'}),
+                    html.P('Basemean',
+                               style={'width': '15%', 'display': 'flex', 'verticalAlign': "middle", 'padding': '5px'}),
+                    html.Div([
+                        dbc.Input(id='toggle_basemean', type='text', value='0',
+                                  placeholder='basemean')
+                    ], style={'display': 'inline-block', 'width': '20%', 'verticalAlign': "middle"})
+                ], style={'display': 'flex', 'verticalAlign': "middle", 'width': '80%'}),
 
+                html.Div([
+                    dbc.Button(id='sig_submit', n_clicks=0, children='Submit'),
+                ], style={'display': 'inline-block', 'verticalAlign':"middle"}),
+
+
+                html.Div([dbc.Button('Add DE set', id='add_de_table')],
+                         style={'display': 'inline-block', 'verticalAlign':"middle"}),
+                html.Div([
+                    dbc.Button('clear DE set', id='clear_de_table')],
+                        style={'display': 'inline-block', 'verticalAlign':"middle"}),
+            ]),
+
+            #TODO remake table to interactive table
+            #TODO add Diverging Data Bars for log2Foldchange, maybe padj
             html.Div([
-                dbc.Button(id='sig_submit', n_clicks=0, children='Submit'),
-            ], style={'display': 'inline-block', 'verticalAlign':"middle"}),
+                html.H4(id='button-clicks')]),
+                    dash_table.DataTable(id='DE-table',
+                                         columns=[
+                                             {'name': "Ensembl", "id": 'Ensembl'},
+                                             {'name': "hgnc", "id": 'hgnc'},
+                                             {'name': "wikigene_desc", "id": 'wikigene_desc'},
+                                             {'name': "baseMean", "id": 'baseMean'},
+                                             {'name': "log2FoldChange", "id": 'log2FoldChange'},
+                                             {'name': "pvalue", "id": 'pvalue'},
+                                             {'name': "padj", "id": 'padj'}],
+                                         style_table={
+                                             'maxHeight': '600px',
+                                             'overflowY': 'scroll'
+                                         },
+                    ),
 
+            html.Br(),
+            html.Div(id = 'table-box'),
+            html.Div(dt.DataTable(id = 'de_table_comp', data=[{}]), style={'display': 'none'}),
+            html.Div(id='de_table_comparison', style={'display': 'none'}),
+            html.Br(),
 
-            html.Div([dbc.Button('Add DE set', id='add_de_table')],
-                     style={'display': 'inline-block', 'verticalAlign':"middle"}),
-            html.Div([
-                dbc.Button('clear DE set', id='clear_de_table')],
-                    style={'display': 'inline-block', 'verticalAlign':"middle"}),
-        ]),
-
-        #TODO remake table to interactive table
-        #TODO add Diverging Data Bars for log2Foldchange, maybe padj
-        html.Div([
-            html.H4(id='button-clicks')]),
-                dash_table.DataTable(id='DE-table',
-                                     columns=[
-                                         {'name': "Ensembl", "id": 'Ensembl'},
-                                         {'name': "hgnc", "id": 'hgnc'},
-                                         {'name': "wikigene_desc", "id": 'wikigene_desc'},
-                                         {'name': "baseMean", "id": 'baseMean'},
-                                         {'name': "log2FoldChange", "id": 'log2FoldChange'},
-                                         {'name': "pvalue", "id": 'pvalue'},
-                                         {'name': "padj", "id": 'padj'}],
-                                     style_table={
-                                         'maxHeight': '600px',
-                                         'overflowY': 'scroll'
-                                     },
-                ),
-
-        html.Br(),
-        html.Div(id = 'table-box'),
-        html.Div(dt.DataTable(id = 'de_table_comp', data=[{}]), style={'display': 'none'}),
-        html.Div(id='de_table_comparison', style={'display': 'none'}),
-        html.Br(),
-
-
+        ], className='row', style={'display': 'flex', 'margin': 'auto', 'border': '1px solid #C6CCD5', 'padding': '20px', 'border-radius': '5px','justify-content': 'space-between', 'margin-top': 5, 'padding': 5}),
         html.Br(),
 
         html.Div([
@@ -727,9 +720,11 @@ layout_index = html.Div([
 
     html.Div(id='alert_import_info_div', children=[
         dmc.Alert(
-            "",
+            "Columns in Count data does not match Rows in Info data",
             id="alert_import_info",
-            color='info',
+            title='Import Error!',
+            color='red',
+
             # is_open=True,
             withCloseButton=True,
             # n_clicks=0,

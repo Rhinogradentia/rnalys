@@ -6,11 +6,10 @@ register(MulticoreParam(4))
 args <- commandArgs(trailingOnly = TRUE)
 indata = args[1]
 insample = args[2]
-norm_type = args[3]
-rowm = args[4]
-design = args[5]
-outfile = args[6]
-reference = args[7]
+rowm = args[3]
+design = args[4]
+outfile = args[5]
+reference = args[6]
 
 #print(indata)
 #print(insample)
@@ -31,7 +30,7 @@ extract_variable <- function(formula_str) {
   return(variable_str)
 }
 
-run_DE <-  function (indata, insample, norm_type, rowm, design, outfile, reference) {
+run_DE <-  function (indata, insample, rowm, design, outfile, reference) {
   #The insample table requires the column "SeqTag" and tissue
   insample <- read.table(insample, sep='\t', header=T)
   rownames(insample) <- insample$X
@@ -125,4 +124,4 @@ run_DE <-  function (indata, insample, norm_type, rowm, design, outfile, referen
 }
 
 
-run_DE(indata, insample, norm_type, rowm, design, outfile, reference)
+run_DE(indata, insample, rowm, design, outfile, reference)
