@@ -16,23 +16,24 @@ import dash_mantine_components as dmc
 import base64
 import io
 
+from typing import List, Tuple, Any
 from dash import dcc
 from dash import html
-from dash import Input, Output, State
 from dash import dash_table
 from collections import Counter
 from dash.exceptions import PreventUpdate
 from sklearn.decomposition import PCA
 from demos import dash_reusable_components as drc
 from layout_content import layout_index, layout_page1
+from dash.dependencies import Input, Output, State
 
-# external_stylesheets = ["https://codepen.io/chriddyp/pen/bWLwgP.css"]
+FONT_AWESOME = "https://use.fontawesome.com/releases/v5.10.2/css/all.css"
 
 app = dash.Dash(
     __name__,
     #external_stylesheets=['https://codepen.io/chriddyp/pen/bWLwgP.css', dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP],
     #external_stylesheets=['https://codepen.io/chriddyp/pen/bWLwgP.css'],
-    external_stylesheets=[dbc.themes.LITERA],
+    external_stylesheets=[dbc.themes.LITERA, FONT_AWESOME],
     suppress_callback_exceptions=True
 )
 
@@ -207,7 +208,7 @@ def update_checkmark(df_counts):
     if df_counts is None:
         raise PreventUpdate
     else:
-        return {'display':'inline-block'}
+        return {'display':'inline-block', 'position':'relative', 'top':'13px', 'left':'-100px'}
 
 
 @app.callback(Output('checkmark_info_div', 'style'),
@@ -216,7 +217,7 @@ def update_checkmark(df_counts):
     if df_counts is None:
         raise PreventUpdate
     else:
-        return {'display':'flex'}#{'display':'inline-block'}
+        return {'display':'flex', 'position':'relative', 'top':'13px', 'left':'-100px'}#{'display':'inline-block'}
 
 
 @app.callback(Output('df_counts', 'data'),
@@ -318,6 +319,8 @@ def switch_tab(at):
     State('save_dataset_name', 'value'))
 def save_dataset(n_clicks, selected_data, dataset_name):
     if n_clicks is None:
+        raise PreventUpdate
+    if dataset_name is None:
         raise PreventUpdate
 
     datasets = json.loads(selected_data)
@@ -483,11 +486,6 @@ def select_var_div(df_info):
     else:
         return {'display':'inline-block'}
 
- #   dcc.Store(id='gene_list_store'),
- #   dcc.Store(id='info_columns_store'),
- #   dcc.Store(id='sample_list_info_store'),
- #   dcc.Store(id='sample_list_counts_store'),
-
 @app.callback(Output('exclude', 'options'),
               Output('rm_confounding', 'options'),
               Output('meta_dropdown', 'options'),
@@ -497,15 +495,8 @@ def select_var_div(df_info):
               Input('counts_columns_store', 'data'),
               Input('counts_index_store', 'data'),
               Input('info_columns_store', 'data'))
-def exclude_dropdown(counts_columns, counts_index, info_columns):#df_counts, df_info):
+def exclude_dropdown(counts_columns, counts_index, info_columns):
     if counts_columns is not None and counts_index is not None and info_columns is not None:
-
-        #df_counts = pd.read_json(df_counts, orient='split')
-        #df_info = pd.read_json(df_info, orient='split')
-
-        #exclude_options = [{'label': j, 'value': j} for j in df_counts.columns]
-        #gene_list = [{'label': j, 'value': j} for j in df_counts.index]
-        #df_info_columns = [{'label': j, 'value': j} for j in df_info.columns]
 
         exclude_options = [{'label': j, 'value': j} for j in counts_columns]
         gene_list = [{'label': j, 'value': j} for j in counts_index]
@@ -531,8 +522,6 @@ def select_helper(paper, data, df_info,verbose=0):
 
         if paper == 'New':
             lSamples = []
-            lExclude = []
-            df_info_temp = df_info
             lBatch = []
             lTissue = []
             lType = []
@@ -602,14 +591,6 @@ def export_plot(n_clicks, indata, prefixes):
         else:
             print('Run DE analysis first')
             return ['Can not create plot (run the analysis)']
-
-
-#@app.callback(
-#    Output('output-data-upload', 'children'),
-#    Input('df_counts', 'data')
-#)
-#def output_from_store(stored_data):
-#    df = pd.read_json(stored_data, orient='split')
 
 
 #Function to only update select data table
@@ -682,7 +663,6 @@ def change_to_hf(instr):
     else:
         return instr
 
-
 def change_to_LVRV(instr):
     if 'LV' in instr:
         return 'LVRV'
@@ -691,8 +671,6 @@ def change_to_LVRV(instr):
     else:
         return instr
 
-
-
 def change_to_EFSF(instr):
     if 'EF' in instr:
         return 'EFSF'
@@ -700,7 +678,6 @@ def change_to_EFSF(instr):
         return 'EFSF'
     else:
         return instr
-
 
 def create_de_table_comp(data, output):
     return html.Div(
@@ -734,6 +711,8 @@ def create_de_table_comp(data, output):
                                              'border': '1px solid #C6CCD5'}
     )
 
+
+'''
 @app.callback(
     [Output('de_table_comparison', 'children'),
     Output('table-box', 'children')],
@@ -741,51 +720,127 @@ def create_de_table_comp(data, output):
      Input('clear_de_table', 'n_clicks_timestamp')],
     [State('DE-table', 'data'),
      State('de_table_comparison', 'children'),
-     State('intermediate-table', 'children')],)
-def add_de_set(btn_add, btn_clear, indata_de, detable_comp, indata):
+     State('intermediate-table', 'children')]
+)
+def add_de_set(btn_add: int, btn_clear: int, indata_de: List[dict],
+               detable_comp: str, intermediate_data: str) -> Tuple[str, Any]:
 
     if btn_add is None:
         raise PreventUpdate
+
+    if btn_clear is not None and btn_clear > btn_add:
+        return json.dumps({'de_table_comp': pd.DataFrame({'hgnc': []}).to_json(orient='split', date_format='iso')}), None
+
+    de_table = pd.DataFrame.from_dict(indata_de) if indata_de else pd.DataFrame()
+
+    if de_table.empty:
+        print('DE table empty')
+        return json.dumps({'de_table_comp': de_table.to_json(orient='split', date_format='iso')}), None
+
+    de_table.index = de_table['Ensembl']
+
+    de_table_comp = None
+    if detable_comp:
+        try:
+            datasets2 = json.loads(detable_comp)
+            de_table_comp = pd.read_json(datasets2['de_table_comp'], orient='split')
+        except json.JSONDecodeError:
+            print('Error parsing detable_comp')
+
+    datasets3 = json.loads(intermediate_data)
+    name = '_'.join(json.loads(datasets3['prefix_sub']))
+    de_table = de_table.rename(columns={'log2FoldChange': name})
+
+    if de_table_comp is not None:
+        df = de_table[['hgnc', name]].copy()
+        df['hgnc_temp'] = df['hgnc']
+        df = df.drop(['hgnc'], axis=1)
+        df = pd.concat([de_table_comp, df], axis=1)
+        df['hgnc'].fillna(df['hgnc_temp'], inplace=True)
+        df = df.drop(['hgnc_temp'], axis=1)
     else:
-        #print(btn_add, btn_clear)
-        if btn_clear is None or btn_add > btn_clear:
-            de_table = pd.DataFrame.from_dict(indata_de)
+        df = de_table[['hgnc', name]].copy()
 
-            if de_table is None:
-                print('DE table empty')
-                df = pd.DataFrame()
-
-            else:
-
-                de_table.index = de_table['Ensembl']
-
-                try:
-                    datasets2 = json.loads(detable_comp)
-                    de_table_comp = pd.read_json(datasets2['de_table_comp'], orient='split')
-                except:
-                    de_table_comp = None
-
-                datasets3 = json.loads(indata)
-                name = '_'.join(json.loads(datasets3['prefix_sub']))
-                de_table = de_table.rename(columns={'log2FoldChange': name})
-
-                if detable_comp is not None:
-                    df = de_table[['hgnc', name]].copy()
-                    df['hgnc_temp'] = df['hgnc']
-                    df = df.drop(['hgnc'], axis=1)
-                    df = pd.concat([de_table_comp, df], axis=1)
-                    df['hgnc'].fillna(df['hgnc_temp'], inplace=True)
-                    df = df.drop(['hgnc_temp'], axis=1)
-
-                else:
-                    df = de_table[['hgnc', name]].copy()
-
-        else:
-            if btn_clear > btn_add:
-                df = pd.DataFrame({'hgnc': []})
+    if isinstance(de_table, pd.DataFrame) and isinstance(de_table_comp, pd.DataFrame) and len(de_table) == len(
+            de_table_comp):
+        comparison = de_table[column].reset_index(drop=True) == de_table_comp[column].reset_index(drop=True)
+        # You can then use this comparison result in your application
+        # For example, let's just print it for now
+        print(comparison)
 
     dataset = {'de_table_comp': df.to_json(orient='split', date_format='iso')}
     data = create_de_table_comp(df, 'de_table_comp')
+
+    return json.dumps(dataset), data
+
+'''
+
+@app.callback(
+    [Output('de_table_comparison', 'children'),
+    Output('table-box', 'children')],
+    [Input('add_de_table', 'n_clicks_timestamp'),
+     Input('clear_de_table', 'n_clicks_timestamp')],
+    [State('DE-table', 'data'),
+     State('de_table_comparison', 'children')]
+)
+def add_de_set(btn_add: int, btn_clear: int, de_table: List[dict],
+               detable_comp: str) -> Tuple[str, Any]:
+    if btn_add is None:
+        raise PreventUpdate
+
+    if btn_clear is not None and btn_clear > btn_add:
+        return json.dumps({'de_table_comp': pd.DataFrame({'hgnc': []}).to_json(orient='split', date_format='iso')}), None
+
+    de_table = pd.DataFrame.from_dict(de_table) if de_table else pd.DataFrame()
+
+    if de_table.empty:
+        print('DE table empty')
+        return json.dumps({'de_table_comp': de_table.to_json(orient='split', date_format='iso')}), None
+
+    if detable_comp is not None:
+        datasets2 = json.loads(detable_comp)
+        detable_comp = pd.read_json(datasets2['de_table_comp'], orient='split')
+
+    de_table.index = de_table['Ensembl']
+    de_table = de_table.drop(['Ensembl'], axis=1)
+    de_table_sorted = de_table.sort_values(by=['log2FoldChange'], ascending=True)
+    de_table_sorted['rank'] = range(1, len(de_table_sorted) + 1)
+
+    ##
+    #if de_table_comp is not None:
+    ##    df = de_table[['hgnc', name]].copy()
+    #   df['hgnc_temp'] = df['hgnc']
+    #    df = df.drop(['hgnc'], axis=1)
+    #    df_sorted = range(1, len(df) + 1)
+    #
+    print(de_table_sorted)
+   # print(detable_comp)
+
+    intermediate_data = json.loads(intermediate_data)
+
+    if detable_comp is not None:
+        #if comparison table is already >2
+        detable_comp = detable_comp.sort_values(by=['log2FoldChange'], ascending=True)
+        detable_comp = range(1, len(detable_comp) + 1)
+        detable_comp = detable_comp.reindex(de_table_sorted.index)
+
+    else:
+        intermediate_data = intermediate_data.sort_values(by=['log2FoldChange'], ascending=True)
+        intermediate_data = range(1, len(intermediate_data) + 1)
+        intermediate_data = intermediate_data.reindex(de_table_sorted.index)
+
+    print(de_table_sorted, intermediate_data)
+
+    df = pd.DataFrame()
+
+    #else:
+    #    df_table_comp = None
+
+    result = pd.concat([de_table_sorted, intermediate_data], axis=1)
+    print(result)
+
+    dataset = {'de_table_comp': result.to_json(orient='split', date_format='iso')}
+    data = create_de_table_comp(result, 'de_table_comp')
 
     return json.dumps(dataset), data
 
@@ -830,15 +885,6 @@ def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_r
                 lSamples = json.loads(datasets['samples'])
 
                 #print('tissue_dropdown:', tissue_dropdown)
-
-                if 'HF' in type_dropdown:
-                    df_info['type'] = df_info['type'].apply(change_to_hf)
-
-                if 'LVRV' in tissue_dropdn:
-                    df_info['tissue'] = df_info['tissue'].apply(change_to_LVRV)
-
-                if 'EFSF' in tissue_dropdn:
-                    df_info['tissue'] = df_info['tissue'].apply(change_to_EFSF)
 
                 if len(lSamples) == 0:
                     # Fiter tissue
@@ -928,17 +974,23 @@ def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_r
         else:
             raise PreventUpdate
 
+
+
 @app.callback(
     Output('barplot', 'figure'),
     [Input('intermediate-table', 'children'),
-     Input('radio_coloring', 'value'),])
-def update_output1(indata, radio_coloring):
+     Input('meta_dropdown_groupby', 'value'),])
+def update_output1(indata, meta_dropdown_groupby):
     if indata is None:
         raise PreventUpdate
     else:
         datasets = json.loads(indata)
         df_meta_temp = pd.read_json(datasets['meta'], orient='split')
         ltraces = []
+
+
+
+        '''
 
         if radio_coloring == 'tissue':
             for tissue in df_meta_temp['tissue'].unique():
@@ -965,6 +1017,8 @@ def update_output1(indata, radio_coloring):
         else:
             #Prevent update on gene-level
             raise PreventUpdate
+
+        '''
 
         return {
             'data': ltraces,
@@ -1166,14 +1220,14 @@ def clicked_out(clickData):
     Output('pca_comp_explained', 'figure'),
     Output('pca_correlation', 'figure'),
     Input('intermediate-table', 'children'),
-    Input('radio_coloring', 'value'),
+    Input('meta_dropdown_groupby', 'value'),
     #Input('input-gene', 'value'),
     Input('radio-text', 'value'),
-    Input('num_genes', 'value'),
+    Input('number_of_genes', 'value'),
     Input('biplot_radio', 'value'),
     Input('biplot_text_radio', 'value'),
     Input('meta_dropdown', 'value'))
-def update_pca_and_barplot(indata, radio_coloring, radio_text, number_of_genes, biplot_radio,
+def update_pca_and_barplot(indata, meta_dropdown_groupby, radio_text, number_of_genes, biplot_radio,
                            biplot_text_radio, dropdown):
 
     if indata is None:
@@ -1208,7 +1262,7 @@ def update_pca_and_barplot(indata, radio_coloring, radio_text, number_of_genes, 
 
         if isinstance(lDropdown[0], (int, float)):
 
-            if radio_text == 'Text':
+            if radio_text:
                 mode_ = 'markers+text'
             else:
                 mode_ = 'markers'#
@@ -1224,7 +1278,7 @@ def update_pca_and_barplot(indata, radio_coloring, radio_text, number_of_genes, 
                 principalDf_temp = principalDf[principalDf[dropdown] == grp]
 
 
-                if radio_text == 'Text':
+                if radio_text:
                     traces.append(
                         go.Scatter(x=principalDf_temp['PCA1'], y=principalDf_temp['PCA2'], marker={'size': 14},
                                    text=principalDf_temp.index, mode='markers+text', name=grp,
@@ -1357,7 +1411,9 @@ def update_de_table(n_clicks, effects, indata, sig_value, basemean):
             #print(df_degenes)
             radiode = datasets['DE_type']
             df_degenes = df_degenes.loc[df_degenes['padj'] <= float(sig_value), ]
-            df_degenes = df_degenes.loc[df_degenes['baseMean'] >= float(basemean), ]
+            if 'baseMean' in df_degenes.columns:
+                df_degenes = df_degenes.loc[df_degenes['baseMean'] >= float(basemean), ]
+
             overlap_genes = list(set(df_degenes.index).intersection(set(df_symbol.index)))
             dTranslate2 = dict(df_symbol.loc[overlap_genes]['wikigene_description'])
             df_degenes['wikigene_desc'] = [dTranslate2.get(x, x) for x in df_degenes.index]
@@ -1366,9 +1422,9 @@ def update_de_table(n_clicks, effects, indata, sig_value, basemean):
 
             df_degenes = pd.concat([df_degenes1, df_degenes2])
             number_of_degenes = df_degenes.shape[0]
-            number_of_degenes = '#DE-genes: ' + str(number_of_degenes) + ' / ' + str(df_counts_combined.shape[0]), \
-                                ' (%s | %s)'%(df_degenes1.shape[0], df_degenes2.shape[0]), ' Fold Change: %s %s'\
-                                %(effects[0], effects[1])
+            #number_of_degenes = '#DE-genes: ' + str(number_of_degenes) + ' / ' + str(df_counts_combined.shape[0]), \
+            #                    ' (%s | %s)'%(df_degenes1.shape[0], df_degenes2.shape[0]), ' Fold Change: %s %s'\
+            #                    %(effects[0], effects[1])
 
             name = datasets['title']+'_'+str(effects[0])+'_'+str(effects[1]) + '_de.tab'
             overlap_genes = list(set(df_degenes.index).intersection(set(df_symbol.index)))

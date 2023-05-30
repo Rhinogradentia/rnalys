@@ -8,7 +8,7 @@ design = args[3]
 reference = args[4]
 outfile = args[5]
 
-
+options(error = function() traceback(3))
 extract_variable <- function(input_string) {
   match <- regmatches(input_string, regexpr("(?<=\\+|~)\\w+$", input_string, perl = TRUE))
   
@@ -30,7 +30,7 @@ extract_first_variable <- function(input_string) {
   }
 }
 
-run_DE <-  function (indata, insample, design, batch, reference, outfile) {
+run_DE <-  function (indata, insample, design, reference, outfile) {
   insample <- read.table(insample, sep='\t', header=T)
   rownames(insample) <- insample$id_tissue
   insample$X <- NULL
@@ -41,12 +41,11 @@ run_DE <-  function (indata, insample, design, batch, reference, outfile) {
 
   #print(dim(indata))
   #print( dim(insample))
-  print(outfile)
+  #print(outfile)
   plotfolder = 'data/generated/plots/'
   prefix = strsplit(outfile,'/')[[1]][4]
   prefix = strsplit(prefix, '.tab')
-  
-
+   
   #if (intype == 'tissue'){
   #  y1= DGEList(counts=indata, genes=rownames(indata), group = factor(insample$tissue))
   #}else{
@@ -54,12 +53,17 @@ run_DE <-  function (indata, insample, design, batch, reference, outfile) {
   #}
 
   #de_variable <- extract_variable(design)
-  print(design) 
-  var = extract_variable(design) 
-  print(var)
-  print(insample[[var]])
-  y1= DGEList(counts=indata, genes=rownames(indata), group = factor(insample[[var]]))
+  #print(design) 
+  var = extract_variable(design)
+
+  group <- factor(insample[[var]]) 
+
+  #print(var)
+  #print(insample[[var]])
   
+  y1= DGEList(counts=indata, genes=rownames(indata), group = group)
+  
+  print(dim(indata)) 
   #Filter out genenes with low expression
   keepRows <- rowSums(cpm(y1)>2) >= 2
   #keepRows = rowMeans(indata) > 10
@@ -76,18 +80,28 @@ run_DE <-  function (indata, insample, design, batch, reference, outfile) {
   plotMDS(y1)
   dev.off()
   
-  print(y1$samples)
+  #print(y1)
+
+  #print(y1$samples)
+  #group <- factor(insample$tissue)
   
-  #y1 <- estimateGLMCommonDisp(y1, design=as.formula(design))
-  #y1 <- estimateGLMTrendedDisp(y1, design=as.formula(design))
-  #y1 <- estimateGLMTagwiseDisp(y1, design=as.formula(design))
-  #y1 <- estimateDisp(y1, design=as.formula(design), robust=TRUE)
-  #y1 <- estimateGLMCommonDisp(y1, design=as.formula(design)) 
+  #design <- model.matrix(~group)
+
+  #print(
+  design <- model.matrix(as.formula(design), data=insample)
+  
+  
+  #print(design)
+  y1 <- estimateGLMCommonDisp(y1, design=design)
+  y1 <- estimateGLMTrendedDisp(y1, design=design)
+  y1 <- estimateGLMTagwiseDisp(y1, design=design)
+  y1 <- estimateDisp(y1, design=design, robust=TRUE)
+  y1 <- estimateGLMCommonDisp(y1, design=design) 
   pdf(paste(plotfolder, prefix, '_BCV.pdf', sep=''))
   plotBCV(y1)
   dev.off()
   
-  fit <- glmFit(y1, as.formula(design))
+  fit <- glmFit(y1, design)
   lrt <- glmLRT(fit)
   #qlf <- glmQLFTest(fit)
   toptags <- topTags(lrt, n=length(rownames(indata)))
@@ -99,6 +113,7 @@ run_DE <-  function (indata, insample, design, batch, reference, outfile) {
   deGenes <- rownames(lrt)[as.logical(deGenes)]
   plotSmear(lrt, de.tags=deGenes)
   abline(h=c(-1, 1), col=2)
+  
   dev.off()
     
   write.table(degenes, outfile, sep='\t', quote = F)

@@ -19,11 +19,11 @@ from dash import dcc
 from dash import html
 from dash import Input, Output, State
 from dash import dash_table
+import dash_daq as daq
 from collections import Counter
 from dash.exceptions import PreventUpdate
 from sklearn.decomposition import PCA
 from demos import dash_reusable_components as drc
-
 
 
 #Genesymbol
@@ -65,6 +65,8 @@ data = [['ens', 'hgnc1', 10, 4, 0.005, 0.9995]]
 df = pd.DataFrame(data, columns=columns)
 
 
+
+
 #Load datasets
 fDatasets = 'data/datasets.txt'
 
@@ -80,7 +82,7 @@ else:
 
 
 
-layout_page1 = html.Div(
+layout_page1 = html.Div(style={'backgroundColor': '#f5f5f5','padding': '25px'},
     children=[
         # Error Message
         html.Div(id="error-message"),
@@ -92,37 +94,18 @@ layout_page1 = html.Div(
             ],
         ),
 
-
         html.Div([
             html.Div([
-                html.P('Load dataset:',
-                       style={'width': '30%', 'display': 'flex', 'verticalAlign': "middle", 'padding': '2px'}),
+                html.P('Load dataset:', style={'width': '100px', 'display': 'flex', 'verticalAlign': "middle", 'padding': '2px', 'margin-top': '15px'}),
                 html.Div([
-                    dcc.Dropdown(id='paper',
-                                 options=[{'label': j, 'value': j} for j in lPapers],
-                                 value='New')
-                ], style={'width': '30%', 'display': 'inline-block'}),
-            ], style={'display': 'flex', 'verticalAlign': "middle", 'width': '50%'}),
-
-            html.Div(id= 'save_dataset_div', children=[
-                dbc.Input(
-                    id='save_dataset_name',
-                    type='text',
-                    placeholder='name dataset'
-                ),
+                    dcc.Dropdown(id='paper', options=[{'label': j, 'value': j} for j in lPapers], value='New'),
+                ], style={'width': '400px', 'display': 'inline-block'}),
                 html.Div([
-                    dmc.Alert(
-                        "-",
-                        id="alert_datafiles_selection",
-                        color='info',
-                        withCloseButton=True,
-                    ),
-                ], style={'display':'none'}),#style={'textAlign': 'left', 'width': '30%', 'margin-top': 5}),
-
-                dbc.Button('Save', id='btn_save_dataset', n_clicks=0),
-                html.Div(id='name_dataset_save'),
-            ], style={'width': '30%', 'display': 'inline-block', 'padding':'5px'}),
-        ]),
+                    html.I(className="fas fa-question-circle fa-lg", id="target", style={'padding': '10px'}),
+                    dbc.Tooltip("Load dataset if you have any saved", target="target", style={'font-size': 15,'width': '400px', 'height': '20px', 'padding': '10px'}),
+                ], style={'display': 'flex', 'align-items': 'center'}),
+            ], style={'display': 'flex', 'align-items': 'center', 'width': '600px'}),
+        ], style={'display': 'flex', 'align-items': 'center', 'width': '100%'}),
 
         html.P(id='dataset_name_placeholder'),
         html.Div([
@@ -131,11 +114,11 @@ layout_page1 = html.Div(
                     html.H3('Select samples', style={'textAlign': 'left', 'padding': '5px'}),
 
                     html.Div([
-                        html.P('Type:', style={'width': '80px', 'display': 'flex', 'verticalAlign':"middle", 'padding':'5px'}),
+                        html.P('Variable 1:', style={'width': '100px', 'display': 'flex', 'verticalAlign':"middle", 'padding':'5px'}),
 
                         html.Div([
                             dcc.Dropdown(
-                                id='variable2_selected_dropdown',
+                                id='variable1_selected_dropdown',
                                 #options=[{'label': j, 'value': j} for j in df_meta_combined['type'].unique().tolist() + ['HF']],
                                 #value=[''],
                                 multi=True,
@@ -144,27 +127,17 @@ layout_page1 = html.Div(
                     ], style={'display': 'flex', 'verticalAlign':"middle", 'width': '80%'}),
 
                     html.Div([
-                        html.P('Tissue:',style={'width': '80px', 'display': 'flex', 'verticalAlign':"middle", 'padding':'5px'}),
+                        html.P('Variable 2:',style={'width': '100px', 'display': 'flex', 'verticalAlign':"middle", 'padding':'5px'}),
                         html.Div([
                             dcc.Dropdown(
-                            id='variable1_selected_dropdown',
-                            #options=[
-                            #    {'label': 'Left Ventricle', 'value': 'LV'},
-                            #    {'label': 'Right Ventricle', 'value': 'RV'},
-                            #    {'label': 'Right atrial', 'value': 'RAA'},
-                            #    {'label': 'Muscle', 'value': 'musc'},
-                            #    {'label': 'EpiFat', 'value': 'EF'},
-                            #    {'label': 'SubFat', 'value': 'SF'},
-                            #    {'label': 'LV+RV', 'value': 'LVRV'},
-                            #    {'label': 'EF+SF', 'value': 'EFSF'}
-                            #],
+                            id='variable2_selected_dropdown',
                             value=[''],
                             multi=True)
                         ], style={'display': 'inline-block', 'width':'100%', 'verticalAlign':"middle"})
                     ], style={'display': 'flex', 'verticalAlign':"middle", 'width': '80%'}),
                     #
                     html.Div([
-                        html.P('Batch:', style={'width': '80px', 'display': 'flex', 'verticalAlign':"middle", 'padding':'5px'}),
+                        html.P('Batch:', style={'width': '100px', 'display': 'flex', 'verticalAlign':"middle", 'padding':'5px'}),
                         html.Div([
                             dcc.Dropdown(
                             id='variable3_selected_dropdown',
@@ -175,7 +148,7 @@ layout_page1 = html.Div(
 
                     html.Div([
                         html.Div(id='exclude_list', style={'display': 'none'}),
-                        html.P('Exclude:', style={'width': '80px', 'display': 'flex', 'verticalAlign':"middle", 'padding':'5px'}),
+                        html.P('Exclude:', style={'width': '100px', 'display': 'flex', 'verticalAlign':"middle", 'padding':'5px'}),
                         html.Div([
                             dcc.Dropdown(
                                 id='exclude',
@@ -186,6 +159,26 @@ layout_page1 = html.Div(
                             )
                         ],style={'display': 'inline-block', 'width':'100%', 'verticalAlign':"middle"})
                     ], style={'display': 'flex', 'verticalAlign':"middle", 'width': '80%'}),
+                    #
+                    html.Div(id='save_dataset_div', children=[
+                        dbc.Input(
+                            id='save_dataset_name',
+                            type='text',
+                            placeholder='name dataset',
+                            style={'padding': '5px', 'width': '300px'}
+                        ),
+                        html.Div([
+                            dmc.Alert(
+                                "-",
+                                id="alert_datafiles_selection",
+                                color='info',
+                                withCloseButton=True,
+                            ),
+                        ], style={'display': 'none'}),  # style={'textAlign': 'left', 'width': '30%', 'margin-top': 5}),
+
+                        dbc.Button('Save', id='btn_save_dataset', n_clicks=0, style={'margin-left': 10}),
+                        html.Div(id='name_dataset_save'),
+                    ], style={'width': '30%', 'display': 'flex', 'padding': '5px'}),
 
                     #html.Div(id='read_table'),
                     html.Div(id='selected_data', style={'display': 'none'}),
@@ -206,7 +199,7 @@ layout_page1 = html.Div(
                                        id='transformation',
                                        options=[{'label': j, 'value': j} for j in ['Sizefactor normalization', 'vsd','rlog','quantilenorm_log2']],
                                        multi=False,
-                                       placeholder='Select Samples to exclude',)
+                                       placeholder='Select transformation',)
                                ], style={'display': 'inline-block', 'width': '100%', 'verticalAlign': "middle"})
                            ], style={'display': 'flex', 'verticalAlign': "middle", 'width': '80%'}),
                             #], style={'display': 'flex', 'verticalAlign': "middle", 'width': '80%'}),
@@ -248,7 +241,7 @@ layout_page1 = html.Div(
                     ]),
                 ], className='row', style={'width': '50%', 'display': 'inline-block'})
 
-            ], className='row', style={'display': 'flex', 'margin': 'auto', 'border': '1px solid #C6CCD5', 'padding': '20px', 'border-radius': '5px','justify-content': 'space-between', 'margin-top': 5, 'padding': 5}),
+            ], className='row', style={'backgroundColor':'white','display': 'flex', 'margin': 'auto', 'border': '1px solid #C6CCD5', 'padding': '20px', 'border-radius': '5px','justify-content': 'space-between', 'margin-top': 5, 'padding': 5}),
 
             html.Div([
                 dmc.Alert(
@@ -286,14 +279,14 @@ layout_page1 = html.Div(
                                      multi=True,
                                      value=['ENSG00000232810'])],
                                      style={'width': '70%', 'display': 'inline-block', 'verticalAlign': "middle"})
-                    ], style={'margin-top': 10}),
+                    ], style={'backgroundColor':'white', 'margin-top': '10px'}),
 
                     html.Div([
                         html.Div([html.P('hgnc:')], style={'width': '5%', 'display': 'inline-block'}),
                         html.Div([dcc.Dropdown(id='input-2_hgnc', options=[{'label': j, 'value': j} for j in hgnc_dropdown],
-                                     multi=True, value=start_genes)],style={'width': '70%', 'display': 'inline-block', 'verticalAlign':"middle"})
+                                     multi=True, value=start_genes)],style={'backgroundColor':'white','width': '70%', 'display': 'inline-block', 'verticalAlign':"middle"})
                     ]),
-                ], style={'display': 'inline-block', 'width':'70%', 'verticalAlign':"middle"}),
+                ], style={'backgroundColor':'white','display': 'inline-block', 'width':'70%', 'verticalAlign':"middle"}),
 
 
 
@@ -320,10 +313,10 @@ layout_page1 = html.Div(
 
                         dcc.Checklist(id='full_text',
                                       options=[
-                                          {'label': 'Full text', 'value': 'fulltext'},
+                                          {'label': ' Full text', 'value': 'fulltext'},
                                       ], labelClassName='Full text'),
 
-                    ], style={'verticalAlign':"middle"}
+                    ], style={'backgroundColor':'white', 'verticalAlign':"middle"}
 
                     ),
 
@@ -331,7 +324,7 @@ layout_page1 = html.Div(
                     '1px solid #C6CCD5', 'padding': 5,
                           'border-radius': '5px', 'display':'inline-block', 'width': '30%', 'verticalAlign':"middle"}
                 ),
-            ], className='row', style={'width': '100%','display': 'inline-block', 'verticalAlign':"middle"}),
+            ], className='row', style={'width': '100%','display': 'inline-block', 'verticalAlign':"middle", }),
 
             html.Div(id='log2_table', style={'display': 'none'}),
 
@@ -346,7 +339,7 @@ layout_page1 = html.Div(
                         active_tab="tab-1",
                     ),
                     html.Div(id="content"),
-            ], style={'margin-top': 5}),
+            ], style={'margin-top': 5, 'backgroundColor':'white',}),
 
             #dcc.Graph(id='indicator-graphic2'),
             #dcc.Graph(id='hpa_graph'),
@@ -355,35 +348,57 @@ layout_page1 = html.Div(
             #                         {"name": i, "id": i} for i in sorted(df_symbol.columns)
             #                     ]),
 
-        ],  className='row', style={'display': 'flex', 'margin': 'auto', 'border': '1px solid #C6CCD5', 'padding': '20px', 'border-radius': '5px','justify-content': 'space-between', 'margin-top': 5, 'padding': 5}),
+        ],  className='row', style={'backgroundColor':'white', 'display': 'flex', 'margin': 'auto', 'border': '1px solid #C6CCD5', 'padding': '20px', 'border-radius': '5px','justify-content': 'space-between', 'margin-top': 5, 'padding': 5}),
 
         html.Br(),
         html.Div([
-            html.Div([html.H2('PCA analysis')], style={"textAlign": "left"}),
+            html.Div([html.H2('PCA analysis')], style={"textAlign": "left", 'margin-top': 5, 'padding': 5}),
 
 
             #dbc.Input(id='input-gene', type='text', placeholder='Insert Gene (Ensembl)'),
-            dbc.Input(id='num_genes', type='text', placeholder='# genes'),
 
             html.Div([
+                dbc.Input(id='number_of_genes', type='text', placeholder='All Genes',
+                          style={'width': '300px', 'height': '35px', 'padding': '20px', 'margin-right': '100px'}),
+                html.P('Color by:',
+                       style={'width': '100px', 'margin-left': '100px', 'margin-right': '10px', 'align-self': 'center',
+                              'margin': '0', 'line-height': '35px'}),
                 dcc.Dropdown(
                     id='meta_dropdown',
-                    #options=[{'label': j, 'value': j} for j in df_meta_combined.columns],
-                    value='tissue'
+                    # options=[{'label': j, 'value': j} for j in df_meta_combined.columns],
+                    value='tissue',
+                    style={'width': '400px', 'textAlign': 'left', 'margin-right': '100px'}
                 ),
-            ], style={'width':'60%'}),
 
-            dcc.RadioItems(id='radio_coloring', options=[{'label': j, 'value': j} for j in ['tissue', 'type', 'batch',
-                                                                                            'Sex', 'gene-level']],
-                           value='tissue', labelStyle={'display': 'inline-block'}),
+                html.P('Group by:',
+                       style={'width': '100px', 'margin-left': '100px', 'margin-right': '10px', 'align-self': 'center',
+                              'margin': '0', 'line-height': '35px'}),
+                dcc.Dropdown(
+                    id='meta_dropdown_groupby',
+                    # options=[{'label': j, 'value': j} for j in df_meta_combined.columns],
+                    value='tissue',
+                    style={'width': '400px', 'textAlign': 'left'}
+                ),
+                html.Div([
+                    daq.BooleanSwitch(id='radio-text', on=False, label="Sample names",
+                                      labelPosition="top"),
+                ], style={'display': 'inline-block', 'margin-left': '100px'}),
 
-            dcc.RadioItems(id='radio-text', options=[{'label': j, 'value': j} for j in ['None', 'Text']], value='None',
-                           labelStyle={'display': 'inline-block'}, labelClassName='Scatter Text'),
+            ], style={'display': 'flex', 'align-items': 'center', 'width': '100%', 'margin-top': 5}),
 
-            dcc.Checklist(
-                id='biplot_radio',
-                options=[{'label': 'Biplot', 'value': 'biplot'}],
-            ),
+            #dcc.RadioItems(id='radio_coloring', options=[{'label': j, 'value': j} for j in ['tissue', 'type', 'batch',
+            #                                                                                'Sex', 'gene-level']],
+            #               value='tissue', labelStyle={'display': 'inline-block'}),
+
+
+
+
+                dcc.Checklist(
+                    id='biplot_radio',
+                    options=[{'label': 'Biplot', 'value': 'biplot'}],
+                ),
+
+
 
             dcc.RadioItems(id='biplot_text_radio'),
 
@@ -410,7 +425,7 @@ layout_page1 = html.Div(
                 html.Div([dcc.Graph(id='pca_correlation')]),
             ]),
 
-        ], className='row', style={'display': 'flex', 'margin': 'auto', 'border': '1px solid #C6CCD5', 'padding': '20px', 'border-radius': '5px','justify-content': 'space-between', 'margin-top': 5, 'padding': 5}),
+        ], className='row', style={'backgroundColor':'white','display': 'flex', 'margin': 'auto', 'border': '1px solid #C6CCD5', 'padding': '20px', 'border-radius': '5px','justify-content': 'space-between', 'margin-top': 5, 'padding': 5}),
 
         html.Br(),
         html.Div([
@@ -445,7 +460,7 @@ layout_page1 = html.Div(
                     ], style={'display': 'flex', 'verticalAlign': "middle", 'width': '80%'}),
 
                     html.Div([
-                        html.P('Desing formula:',
+                        html.P('Design formula:',
                                style={'width': '10%', 'display': 'flex', 'verticalAlign': "middle", 'padding': '5px'}),
                         html.Div([
                             dbc.Input(id='design', type='text', value='~',
@@ -504,7 +519,8 @@ layout_page1 = html.Div(
                 #], style={'width': '100%', 'padding':'5px'})
             ], style={'margin-top': 10, 'border':
                                     '1px solid #C6CCD5', 'padding': 5,
-                                    'border-radius': '5px'}),
+                                    'border-radius': '5px',
+                                    'backgroundColor':'white',}),
 
 
             html.Br(),
@@ -603,7 +619,7 @@ layout_page1 = html.Div(
             html.Div(id='de_table_comparison', style={'display': 'none'}),
             html.Br(),
 
-        ], className='row', style={'display': 'flex', 'margin': 'auto', 'border': '1px solid #C6CCD5', 'padding': '20px', 'border-radius': '5px','justify-content': 'space-between', 'margin-top': 5, 'padding': 5}),
+        ], className='row', style={'backgroundColor':'white', 'display': 'flex', 'margin': 'auto', 'border': '1px solid #C6CCD5', 'padding': '20px', 'border-radius': '5px','justify-content': 'space-between', 'margin-top': 5, 'padding': 5}),
         html.Br(),
 
         html.Div([
@@ -627,7 +643,7 @@ layout_page1 = html.Div(
             ),
 
             html.Div(id="enrichr_content"),
-        ]),
+        ], style={'margin-top': 5, 'padding': 5}),
 
 
         html.Div(id='Enrichr_GO_bp_up_ph', style={'display': 'none'}),
@@ -640,140 +656,132 @@ layout_page1 = html.Div(
         html.Div(id='Enrichr_kegg_dn_ph', style={'display': 'none'}),
 
 
-    ], style={'padding': '25px'}
+    ]#, style={}
 
 )
 
 layout_index = html.Div([
     dbc.Container([
-    html.Div([
-       html.P('Setup')
-    ]),
-
         html.Div([
-            html.Div(
-                     children=[
+           html.H5('Upload your counts with corresponding info file and get started!'),
+        ], style={'padding': '25px'}),
 
-                        dcc.Upload(
-                            id='upload-data',
-                            children=html.Div([
-                                'Drag and Drop or ',
-                                html.A('Select Count File')
-                            ]),
-                            style={
-                                'width': '400px',
-                                'height': '60px',
-                                'lineHeight': '60px',
-                                'borderWidth': '1px',
-                                'borderStyle': 'dashed',
-                                'borderRadius': '5px',
-                                'textAlign': 'center',
-                                'margin': '10px'
-                            },
-                            multiple=False
-                        ),
-                html.Div(id='checkmark_counts_div',
-                    children = [
-                    html.Img(src=b64_image('assets/checkmark.jpg'), height='60',width='60'),
-                ], style={'display':'none'})
+            html.Div([
+                html.Div(
+                         children=[
+
+                            dcc.Upload(
+                                id='upload-data',
+                                children=html.Div([
+                                    'Drag and Drop or ',
+                                    html.A('Select Count File')
+                                ]),
+                                style={
+                                    'width': '400px',
+                                    'height': '60px',
+                                    'lineHeight': '60px',
+                                    'borderWidth': '1px',
+                                    'borderStyle': 'dashed',
+                                    'borderRadius': '5px',
+                                    'textAlign': 'center',
+                                    'margin': '10px'
+                                },
+                                multiple=False
+                            ),
+
+                            html.Div(id='checkmark_counts_div',
+                                children = [
+                                html.Img(src=b64_image('assets/checkmark.jpg'), height='60',width='60'),
+                            ], style={'display':'none'})
 
             ],style={'width':'100%', 'display': 'flex', 'justify-content': 'space-between'}),
 
-            #html.Div(id='store_counts'),
-            html.Div([
-                dcc.Upload(
-                    id='upload-data-info',
-                    children=html.Div([
-                        'Drag and Drop or ',
-                        html.A('Select Info File')
-                    ]),
-                    style={
-                        'width': '400px',
-                        'height': '60px',
-                        'lineHeight': '60px',
-                        'borderWidth': '1px',
-                        'borderStyle': 'dashed',
-                        'borderRadius': '5px',
-                        'textAlign': 'center',
-                        'margin': '10px'
-                    },
-                    multiple=False
+                html.Div([
+                    dcc.Upload(
+                        id='upload-data-info',
+                        children=html.Div([
+                            'Drag and Drop or ',
+                            html.A('Select Info File')
+                        ]),
+                        style={
+                            'width': '400px',
+                            'height': '60px',
+                            'lineHeight': '60px',
+                            'borderWidth': '1px',
+                            'borderStyle': 'dashed',
+                            'borderRadius': '5px',
+                            'textAlign': 'center',
+                            'margin': '10px'
+                        },
+                        multiple=False
+                    ),
+                    html.Div(id='checkmark_info_div',
+                             children=[
+                                 html.Img(src=b64_image('assets/checkmark.jpg'), height='60',width='60'),
+                             ], style={'display': 'none'})
+
+                ], style={'width':'100%', 'display': 'flex', 'justify-content': 'space-between'}),
+            ], style={'display': 'flex', 'justify-content': 'space-between'}),
+
+        html.Div(id='alert_import_div', children=[
+                dmc.Alert(
+                    "import error",
+                    id="alert_import",
+                    color='info',
+                    #is_open=True,
+                    withCloseButton=True,
+                    # n_clicks=0,
                 ),
-                html.Div(id='checkmark_info_div',
-                         children=[
-                             html.Img(src=b64_image('assets/checkmark.jpg'), height='60',width='60'),
-                         ], style={'display': 'none'})
+        ], style={'display':'none'}),
 
-            ], style={'width':'100%', 'display': 'flex', 'justify-content': 'space-between'}),
-        ]),
-
-    html.Div(id='alert_import_div', children=[
+        html.Div(id='alert_import_info_div', children=[
             dmc.Alert(
-                "import error",
-                id="alert_import",
-                color='info',
-                #is_open=True,
+                "Columns in Count data does not match Rows in Info data",
+                id="alert_import_info",
+                title='Import Error!',
+                color='red',
+
+                # is_open=True,
                 withCloseButton=True,
                 # n_clicks=0,
             ),
-    ], style={'display':'none'}),
+        ], style={'display':'none'}),
 
-    html.Div(id='alert_import_info_div', children=[
-        dmc.Alert(
-            "Columns in Count data does not match Rows in Info data",
-            id="alert_import_info",
-            title='Import Error!',
-            color='red',
+        html.Br(),
 
-            # is_open=True,
-            withCloseButton=True,
-            # n_clicks=0,
-        ),
-    ], style={'display':'none'}),
+        html.Div(id='df_combability_check', style={'display':'none'}),
+        #html.Div(id='df_info_check', style={'display':'none'}),
 
-     #   html.Div([
-     #       html.P('Load dataset:',
-     #              style={'width': '30%', 'display': 'flex', 'verticalAlign': "middle", 'padding': '2px'}),
-     #       html.Div([
-     #           dcc.Dropdown(id='paper',
-     #                        options=[{'label': j, 'value': j} for j in lPapers],
-     ##                        value='New')
-      #      ], style={'width': '30%', 'display': 'inline-block'}),
-      #  ], style={'display': 'flex', 'verticalAlign': "middle", 'width': '50%'}),
+        html.Div(id='varaible_selection_div', children=[
 
-    html.Br(),
+            html.H5('Select variables for sample selection'),
+            html.Div([
+                html.P('Select variable 1 column', style={'width': '250px', 'display': 'flex', 'verticalAlign': "middle", 'padding': '2px'}),
+                dcc.Dropdown(id='variable_selection1', style={'width': '250px', 'display': 'inline-block'}),
+            ], style={'display': 'flex', 'verticalAlign': "middle", 'width': '100%'}),
 
-    html.Div(id='df_combability_check', style={'display':'none'}),
-    #html.Div(id='df_info_check', style={'display':'none'}),
+            html.Div([
+                html.P('Select variable 2 column',
+                       style={'width': '250px', 'display': 'flex', 'verticalAlign': "middle", 'padding': '2px'}),
+                dcc.Dropdown(id='variable_selection2', style={'width': '250px', 'display': 'inline-block'}),
+            ], style={'display': 'flex', 'verticalAlign': "middle", 'width': '100%'}),
 
-    html.Div(id='varaible_selection_div', children=[
-        html.Div([
-            html.P('Select Tissue column', style={'width': '250px', 'display': 'flex', 'verticalAlign': "middle", 'padding': '2px'}),
-            dcc.Dropdown(id='variable_selection1', style={'width': '250px', 'display': 'inline-block'}),
-        ], style={'display': 'flex', 'verticalAlign': "middle", 'width': '100%'}),
-
-        html.Div([
-            html.P('Select Tissue column',
-                   style={'width': '250px', 'display': 'flex', 'verticalAlign': "middle", 'padding': '2px'}),
-            dcc.Dropdown(id='variable_selection2', style={'width': '250px', 'display': 'inline-block'}),
-        ], style={'display': 'flex', 'verticalAlign': "middle", 'width': '100%'}),
-
-        html.Div([
-            html.P('Select batch column',
-                   style={'width': '250px', 'display': 'flex', 'verticalAlign': "middle", 'padding': '2px'}),
-            dcc.Dropdown(id='variable_selection3', style={'width': '250px', 'display': 'inline-block'}),
-        ], style={'display': 'flex', 'verticalAlign': "middle", 'width': '100%'}),
+            html.Div([
+                html.P('Select batch column',
+                       style={'width': '250px', 'display': 'flex', 'verticalAlign': "middle", 'padding': '2px'}),
+                dcc.Dropdown(id='variable_selection3', style={'width': '250px', 'display': 'inline-block'}),
+            ], style={'display': 'flex', 'verticalAlign': "middle", 'width': '100%'}),
 
 
-    ], style={'display':'none'}),
-    html.Br(),
-    html.Div(id='page_proceed', children=[
-        dbc.Button('Proceed', href='/page-1'),
-    ], style={'display':'none'}),
-    html.Br(),
-    #dcc.Link('WGCNA + Enrichr', href='/page-2'),
-    #html.Div(id='df_counts', style={'display': 'none'}),
-    #html.Div(id='df_info', style={'display': 'none'}),
+        ], style={'display':'none'}),
+        html.Br(),
+        html.Div(id='page_proceed', children=[
+            dbc.Button('Proceed', href='/page-1'),
+        ], style={'display':'none'}),
+        html.Br(),
+        #dcc.Link('WGCNA + Enrichr', href='/page-2'),
+        #html.Div(id='df_counts', style={'display': 'none'}),
+        #html.Div(id='df_info', style={'display': 'none'}),
 
-], style={'verticalAlign': 'center'}),
+    ], style={'verticalAlign': 'center', 'border': '1px solid #C6CCD5', 'border-radius': '5px', 'padding': '50px', 'margin': '10%'}),
 ])
