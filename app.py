@@ -15,6 +15,8 @@ import dash_bootstrap_components as dbc
 import dash_mantine_components as dmc
 import base64
 import io
+import random
+import string
 
 from typing import List, Tuple, Any
 from dash import dcc
@@ -98,6 +100,52 @@ df = pd.DataFrame(data, columns=columns)
 layout_index = layout_index
 layout_page1 = layout_page1
 
+def generate_random_string(length=7):
+    characters = string.ascii_letters + string.digits
+    random_string = ''.join(random.choices(characters, k=length))
+    return random_string
+
+def write_sample_names_to_file(sample_names, transformation, id_name, file_string):
+    # Generate a random filename
+    outdir = 'data/datasets/'
+    if not os.path.exists(outdir):
+        # If the directory doesn't exist, create it
+        os.makedirs(outdir)
+
+    filename_path = outdir+file_string + ".txt"
+    matched_file_path = search_files_for_samples(sample_names, transformation)
+    if matched_file_path:
+        pass
+    else:
+        # Open the file in write mode
+        with open(filename_path, 'w') as f:
+            # Write the sample names to the file
+            # > sample1 sample2 sample3 transformation %id_name %file_string
+            f.write('> ' + ' '.join(sample_names)+' '+transformation +' %'+id_name +' %' + file_string+'\n')
+
+        print(f"Sample names written to file: {filename_path}")
+
+def search_files_for_samples(sample_string, transformation):
+    # List all files in the directory
+    if not os.path.exists(outdir):
+        # If the directory doesn't exist, create it
+        os.makedirs(outdir)
+
+    files = os.listdir(outdir)
+    set_samples_transformation = set(sample_string.split(' ')).add(transformation)
+
+    for filename in files:
+        # Open the file and read its contents
+        with open(os.path.join(outdir, filename), 'r') as f:
+            for line in f:
+                if '>' in line:
+                    line = line.split('>')[1]
+                    sample_list_compare = line.split(' %')[0] #contains both sample list and transformation
+                    set_samples_transformation_compare = set(sample_list_compare.split(' '))
+                    if set_samples_transformation == set_samples_transformation_compare:
+                        return line.split(' %')[2]
+            else:
+                return None
 
 def file_len(fname):
     with open(fname) as f:
@@ -327,7 +375,8 @@ def save_dataset(n_clicks, selected_data, dataset_name):
     lSamples = json.loads(datasets['samples'])
     dataset_name = ''.join(dataset_name.split())
     print([dataset_name, ' '.join(lSamples)])
-    save_dataset_to_file([dataset_name, ' '.join(lSamples)])
+    #save_dataset_to_file([dataset_name, ' '.join(lSamples)])
+    write_sample_names_to_file(lSamples, 'test')
 
 @app.callback(Output('page-content', 'children'),
               [Input('url', 'pathname')])
@@ -338,6 +387,8 @@ def display_page(pathname):
         return layout_page2
     else:
         return layout_index
+
+#def load_dataset_():
 
 def load_dataset(paper):
     datasets_file = 'data/datasets.txt'
@@ -379,12 +430,6 @@ def exclude_helper(exclude, verbose=0):
         print(exclude)
     return [json.dumps(exclude)]
 
-
-#   html.Div(id='varaible_selection_div', children=[
-#        html.Div([
-#            html.P('Select Tissue column'),
-#            dcc.Dropdown(id='varable_selection_div')
-#        ]),
 
 @app.callback(Output('variable_selection1', 'options'),
              Input('df_info', 'data'))
@@ -490,6 +535,7 @@ def select_var_div(df_info):
               Output('rm_confounding', 'options'),
               Output('meta_dropdown', 'options'),
               Output('gene_list', 'options'),
+              Output('meta_dropdown_groupby', 'options'),
               #Input('df_counts', 'data'),
               #Input('df_info', 'data'))
               Input('counts_columns_store', 'data'),
@@ -502,7 +548,7 @@ def exclude_dropdown(counts_columns, counts_index, info_columns):
         gene_list = [{'label': j, 'value': j} for j in counts_index]
         df_info_columns = [{'label': j, 'value': j} for j in info_columns]
 
-        return exclude_options, df_info_columns, df_info_columns, gene_list
+        return exclude_options, df_info_columns, df_info_columns, gene_list, df_info_columns
     else:
         raise PreventUpdate
 
@@ -598,86 +644,54 @@ def export_plot(n_clicks, indata, prefixes):
     [Output('selected_data', 'children'),
     Output('alert_selection', 'hide')],
     [Input('exclude', 'value'),
-    Input('variable_selection3_store', 'data'),
-    Input('variable_selection1_store', 'data'),
-    Input('variable_selection2_store', 'data'),
     Input('transformation', 'value'),
+     Input('variable1_selected_dropdown', 'value'),
+    Input('variable2_selected_dropdown', 'value'),
     Input('variable3_selected_dropdown', 'value'),
-    Input('variable1_selected_dropdown', 'value'),
-    Input('variable2_selected_dropdown', 'value')],
+    Input('variable_selection1_store', 'data'),
+    Input('variable_selection1_store', 'data'),
+    Input('variable_selection1_store', 'data')],
     [State('df_info', 'data')],
     prevent_initial_call=True)
-def select_info(lExclude, batch_dropdown,  tissue_dropdown, type_dropdown, transformation, variable3, variable1, variable2, df_info):
+def select_info(lExclude, transformation, variable1_dropdown, variable2_dropdown, variable3_dropdown, variable1, variable2, variable3, df_info):
     #variable_selection1_store = column_name_variable1 = tissue
     #variable1 = LV RV etc
-    if batch_dropdown is not None and tissue_dropdown is not None and type_dropdown is not None and transformation is not None:
+    if variable1_dropdown is not None and variable2_dropdown is not None and variable3_dropdown is not None and transformation is not None:
 
         df_info = pd.read_json(df_info, orient='split')
 
-        '''
-        if 'LVRV' in tissue_dropdown:
-            tissue_dropdown = tissue_dropdown + ['LV', 'RV']
-        if 'EFSF' in tissue_dropdown:
-            tissue_dropdown = tissue_dropdown + ['EF', 'SF']
-        if 'HF' in type_dropdown:
-            type_dropdown = type_dropdown + ['HFrEF', 'HFPEF']
-        '''
+        transformation = 'None' if transformation == 'Sizefactor normalization' else transformation
 
-
-        if transformation =='Sizefactor normalization':
-            transformation = 'None'
-        else:
-            transformation = transformation
-
-        df_info_temp = df_info.loc[df_info[batch_dropdown].isin(variable3),]
+        df_info_temp = df_info.loc[df_info[variable1].isin(variable1_dropdown),]
         #df_info_temp = df_info.loc[df_info['SeqTag'].isin(batch_dropdown),]
         #df_info_temp = df_info_temp.loc[df_info_temp['tissue'].isin(tissue_dropdown),]
-        df_info_temp = df_info_temp.loc[df_info_temp[tissue_dropdown].isin(variable1),]
-        #df_info_temp = df_info_temp.loc[df_info_temp['type'].isin(type_dropdown), ]
-        df_info_temp = df_info_temp.loc[df_info_temp[type_dropdown].isin(variable2),]
+        df_info_temp = df_info_temp.loc[df_info_temp[variable2].isin(variable2_dropdown),]
+        df_info_temp = df_info_temp.loc[df_info_temp[variable3].isin(variable3_dropdown),]
+
 
         if lExclude is not None:
             df_info_temp = df_info_temp.loc[~df_info_temp['id_tissue'].isin(lExclude), ]
 
+        #add full_name
 
-        datasets = {'tissues': json.dumps(df_info_temp['tissue'].unique().tolist()),
+        #df_info_temp.index = df_info_temp[[variable1, variable1]].apply(lambda x: '_'.join(x), axis=1)
+        df_info_temp['full_name'] = [x+'_'+df_info_temp.loc[x, variable1] for x in df_info_temp.index]
+
+
+        datasets = {'tissues': json.dumps(df_info_temp[variable1].unique().tolist()),
                     'transformation': transformation,
-                    'types': json.dumps(df_info_temp['type'].unique().tolist()),
-                    'batches': json.dumps(df_info_temp['SeqTag'].unique().tolist()),
+                    'types': json.dumps(df_info_temp[variable2].unique().tolist()),
+                    'batches': json.dumps(df_info_temp[variable3].unique().tolist()),
                     'exclude': json.dumps(lExclude),
-                    'samples': json.dumps(df_info_temp['id_tissue'].to_list()),
+                    'samples': json.dumps(df_info_temp.index.to_list()),
+                    'full_name': json.dumps(df_info_temp['full_name'].to_list()),
                     'empty': '0'}
 
         return json.dumps(datasets), ''
 
-
     else:
         empty = {'empty': '1'}
         return json.dumps(empty), 'testtesttest'
-
-def change_to_hf(instr):
-    if 'HFPEF' in instr:
-        return 'HF'
-    if 'HFrEF' in instr:
-        return 'HF'
-    else:
-        return instr
-
-def change_to_LVRV(instr):
-    if 'LV' in instr:
-        return 'LVRV'
-    if 'RV' in instr:
-        return 'LVRV'
-    else:
-        return instr
-
-def change_to_EFSF(instr):
-    if 'EF' in instr:
-        return 'EFSF'
-    if 'SF' in instr:
-        return 'EFSF'
-    else:
-        return instr
 
 def create_de_table_comp(data, output):
     return html.Div(
@@ -806,13 +820,6 @@ def add_de_set(btn_add: int, btn_clear: int, de_table: List[dict],
     de_table_sorted = de_table.sort_values(by=['log2FoldChange'], ascending=True)
     de_table_sorted['rank'] = range(1, len(de_table_sorted) + 1)
 
-    ##
-    #if de_table_comp is not None:
-    ##    df = de_table[['hgnc', name]].copy()
-    #   df['hgnc_temp'] = df['hgnc']
-    #    df = df.drop(['hgnc'], axis=1)
-    #    df_sorted = range(1, len(df) + 1)
-    #
     print(de_table_sorted)
    # print(detable_comp)
 
@@ -830,11 +837,6 @@ def add_de_set(btn_add: int, btn_clear: int, de_table: List[dict],
         intermediate_data = intermediate_data.reindex(de_table_sorted.index)
 
     print(de_table_sorted, intermediate_data)
-
-    df = pd.DataFrame()
-
-    #else:
-    #    df_table_comp = None
 
     result = pd.concat([de_table_sorted, intermediate_data], axis=1)
     print(result)
@@ -854,12 +856,13 @@ def add_de_set(btn_add: int, btn_clear: int, de_table: List[dict],
     State('rm_confounding', 'value'),
     State('full_text', 'value'),
     State('force_run', 'value'),
-    State('variable1_selected_dropdown', 'value'),
     State('df_counts', 'data'),
     State('df_info', 'data'),
-    prevent_initial_call=True,)
-def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_run, tissue_dropdn, df_counts, df_info):
-    #print(n_clicks)
+    State('variable_selection1_store', 'data'),
+    State('variable_selection2_store', 'data'),
+    State('variable_selection3_store', 'data'),
+    prevent_initial_call=True)
+def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_run, df_counts, df_info, variable_selection1, variable_selection2, variable_selection3):
     if n_clicks is 0:
         raise PreventUpdate
     else:
@@ -874,9 +877,12 @@ def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_r
             #print(selected_data)
             datasets = json.loads(selected_data)
 
+            #For saving selection of samples to file
+            file_string = generate_random_string()
+
             empty = json.loads(datasets['empty'])
             if empty != '0':
-
+                '''
                 tissue_dropdown = json.loads(datasets['tissues'])
                 type_dropdown = json.loads(datasets['types'])
                 batch_dropdown = json.loads(datasets['batches'])
@@ -917,17 +923,12 @@ def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_r
                     exclude = [x.split('SLL')[1] for x in exclude]
                 else:
                     exclude = ['']
-                #print(df_meta_combined['tissue'])
+
                 lTotal = exclude + tissue_dropdown + batch_dropdown + type_dropdown
                 sPrefix_tissue_batch_type = tissue_dropdown + batch_dropdown + type_dropdown+[transformation]
 
                 name_counts_for_pca = './data/generated/' + ''.join(lTotal) + '_counts.tab'
                 name_meta_for_pca = './data/generated/' + ''.join(lTotal) + '_meta.tab'
-
-                #remember
-                #dTranslate = dict(df_symbol['hgnc_symbol'])
-                #df_counts_raw.index = [dTranslate.get(x, x) for x in df_counts_raw.index]
-
 
                 df_counts_raw.to_csv(name_counts_for_pca, sep='\t')
                 df_info_temp.to_csv(name_meta_for_pca, sep='\t')
@@ -945,7 +946,7 @@ def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_r
                 cmd = 'Rscript ./functions/normalize_vsd_rlog_removebatch2.R %s %s %s %s %s' % (
                     name_counts_for_pca, name_meta_for_pca, performance, name_out, transformation)
 
-                if not os.path.isfile(name_out):
+                if not search_files_for_samples(list(df_info_temp.index), performance, transformation):
                     print(cmd)
                     os.system(cmd)
                 else:
@@ -954,6 +955,16 @@ def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_r
                         os.system(cmd)
                     else:
                         print('Loading file: %s' %name_out)
+
+                #if not os.path.isfile(name_out):
+                #    print(cmd)
+                #    os.system(cmd)
+                #else:
+                #    if force_run:
+                #        print(cmd)
+                #        os.system(cmd)
+                #    else:
+                #        print('Loading file: %s' %name_out)
 
                 df_counts_temp_norm = pd.read_csv(name_out, sep='\t', index_col=0)
 
@@ -967,6 +978,110 @@ def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_r
                             'prefix_sub': json.dumps(sPrefix_tissue_batch_type)}
 
                 outf = '_'.join(lTotal)
+            '''
+
+                print(variable_selection1)
+                var1_dropdown = json.loads(datasets[variable_selection1])
+                var2_dropdown = json.loads(datasets[variable_selection2])
+                var3_dropdown = json.loads(datasets[variable_selection3])
+                exclude = json.loads(datasets['exclude'])
+                transformation = datasets['transformation']
+                lSamples = json.loads(datasets['samples'])
+
+                if len(lSamples) == 0:
+
+                    df_info_temp = df_info.loc[
+                        df_info.loc[df_info[variable_selection1].isin(var1_dropdown),].index]
+
+                    df_info_temp = df_info_temp.loc[
+                        df_info_temp.loc[df_info_temp[variable_selection2].isin(var2_dropdown),].index]
+
+                    df_info_temp = df_info_temp.loc[df_info_temp[variable_selection3].isin(var3_dropdown),]
+
+                    if exclude:
+                        for sample_excl in exclude:
+                            if sample_excl in df_info_temp.index:
+                                df_info_temp = df_info_temp.drop(sample_excl)
+                else:
+                    print(lSamples)
+                    # loading samples from datasets.txt
+                    df_info_temp = df_info.loc[lSamples,]
+
+                if fulltext:
+                    df_counts_raw = df_counts[df_info_temp.index]
+                    #df_info_temp[['id_tissue', variable_selection2]].apply(lambda x: '_'.join(x), axis=1)
+                    df_info_temp.index = df_info_temp['full_name']
+                    # Change names in count files
+                    df_counts_raw.columns = df_info_temp.index
+                else:
+                    df_counts_raw = df_counts[df_info_temp.index]
+
+                if exclude:
+                    exclude = [x.split('SLL')[1] for x in exclude]
+                else:
+                    exclude = ['']
+
+                #lTotal = exclude + tissue_dropdown + batch_dropdown + type_dropdown
+                #sPrefix_tissue_batch_type = tissue_dropdown + batch_dropdown + type_dropdown + [transformation]
+
+                name_counts_for_pca = './data/generated/' + file_string + '_counts.tab'
+                name_meta_for_pca = './data/generated/' + file_string + '_meta.tab'
+
+                #name_counts_for_pca = './data/generated/' + ''.join(lTotal) + '_counts.tab'
+                #name_meta_for_pca = './data/generated/' + ''.join(lTotal) + '_meta.tab'
+
+                df_counts_raw.to_csv(name_counts_for_pca, sep='\t')
+                df_info_temp.to_csv(name_meta_for_pca, sep='\t')
+
+                # Setup the design for linear model
+                if rm_confounding != None:
+                    performance = 'batch_' + str(rm_confounding)
+
+                else:
+                    performance = 'batch_nobatch'
+
+                # Run R script for normalization and transformation
+                print('PERFOMRAMCE', performance)
+                #name_out = './data/generated/' + ''.join(
+                #    lTotal) + '_' + performance + '_' + transformation + '_normalized.tab'
+
+                name_out =  './data/generated/'+ file_string +'_normalized.tab'
+                cmd = 'Rscript ./functions/normalize_vsd_rlog_removebatch2.R %s %s %s %s %s' % (
+                    name_counts_for_pca, name_meta_for_pca, performance, name_out, transformation)
+
+                if not search_files_for_samples(list(df_info_temp.index), performance, transformation):
+                    print(cmd)
+                    os.system(cmd)
+                else:
+                    if force_run:
+                        print(cmd)
+                        os.system(cmd)
+                    else:
+                        print('Loading file: %s' % name_out)
+
+                # if not os.path.isfile(name_out):
+                #    print(cmd)
+                #    os.system(cmd)
+                # else:
+                #    if force_run:
+                #        print(cmd)
+                #        os.system(cmd)
+                #    else:
+                #        print('Loading file: %s' %name_out)
+
+                df_counts_temp_norm = pd.read_csv(name_out, sep='\t', index_col=0)
+
+                datasets = {'counts_norm': df_counts_temp_norm.to_json(orient='split', date_format='iso'),
+                            'transformation': transformation,
+                            'meta': df_info_temp.to_json(orient='split', date_format='iso'),
+                            'counts_raw': df_counts_raw.to_json(orient='split', date_format='iso'),
+                            'counts_raw_file_name': json.dumps(name_counts_for_pca),
+                            'perf_file': json.dumps(name_out),
+                            'prefixes': json.dumps(lTotal),
+                            'prefix_sub': json.dumps(sPrefix_tissue_batch_type)}
+
+                outf = '_'.join(lTotal)
+
             alert_mess = 'test out'
 
             return json.dumps(datasets), alert_mess, ''
@@ -978,9 +1093,12 @@ def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_r
 
 @app.callback(
     Output('barplot', 'figure'),
-    [Input('intermediate-table', 'children'),
-     Input('meta_dropdown_groupby', 'value'),])
-def update_output1(indata, meta_dropdown_groupby):
+    Input('intermediate-table', 'children'),
+     Input('meta_dropdown_groupby', 'value'),
+    State('variable_selection1_store', 'data'),
+    State('variable_selection2_store', 'data'),
+    State('variable_selection3_store', 'data'))
+def update_output1(indata, meta_dropdown_groupby, variable1, variable2, variable3):
     if indata is None:
         raise PreventUpdate
     else:
@@ -988,42 +1106,17 @@ def update_output1(indata, meta_dropdown_groupby):
         df_meta_temp = pd.read_json(datasets['meta'], orient='split')
         ltraces = []
 
+        #Variable3 == batch variable
 
-
-        '''
-
-        if radio_coloring == 'tissue':
-            for tissue in df_meta_temp['tissue'].unique():
-                df_tissue = df_meta_temp.loc[df_meta_temp['tissue'] == tissue,]
-                df_batch_tissue = df_tissue.groupby('SeqTag').count()
-                trace = go.Bar(x=df_batch_tissue.index, y=df_batch_tissue['id_tissue'], name=tissue)
-                ltraces.append(trace)
-
-
-        elif radio_coloring == 'type':
-            for type in df_meta_temp['type'].unique():
-                df_type = df_meta_temp.loc[df_meta_temp['type'] == type,]
-                df_batch_type = df_type.groupby('type').count()
-                trace = go.Bar(x=df_batch_type.index, y=df_batch_type['id_tissue'], name=type)
-                ltraces.append(trace)
-
-        elif radio_coloring == 'SeqTag':
-            for batch in df_meta_temp['SeqTag'].unique():
-                df_batch = df_meta_temp.loc[df_meta_temp['SeqTag'] == batch,]
-                df_batch = df_batch.groupby('SeqTag').count()
-                trace = go.Bar(x=df_batch.index, y=df_batch['id_tissue'], name='test')
-                ltraces.append(trace)
-
-        else:
-            #Prevent update on gene-level
-            raise PreventUpdate
-
-        '''
+        for x in df_meta_temp[meta_dropdown_groupby].unique():
+            df_temp = df_meta_temp.loc[df_meta_temp[meta_dropdown_groupby] == x,]
+            df_temp = df_temp.groupby(variable3).count()
+            trace = go.Bar(x=df_temp.index, y=df_temp['id_tissue'], name=x)
+            ltraces.append(trace)
 
         return {
             'data': ltraces,
             'layout': go.Layout(
-
             )
         }
 
@@ -1222,12 +1315,12 @@ def clicked_out(clickData):
     Input('intermediate-table', 'children'),
     Input('meta_dropdown_groupby', 'value'),
     #Input('input-gene', 'value'),
-    Input('radio-text', 'value'),
+    Input('sample_names_toggle', 'on'),
     Input('number_of_genes', 'value'),
     Input('biplot_radio', 'value'),
     Input('biplot_text_radio', 'value'),
     Input('meta_dropdown', 'value'))
-def update_pca_and_barplot(indata, meta_dropdown_groupby, radio_text, number_of_genes, biplot_radio,
+def update_pca_and_barplot(indata, meta_dropdown_groupby, sample_names_toggle, number_of_genes, biplot_radio,
                            biplot_text_radio, dropdown):
 
     if indata is None:
@@ -1242,7 +1335,7 @@ def update_pca_and_barplot(indata, meta_dropdown_groupby, radio_text, number_of_
                 df_counts_pca.var(axis=1).sort_values(ascending=False).iloc[0:int(number_of_genes), ].index,]
             df_counts_pca.to_csv('~/Dropbox/dash/pca_counts.tab', sep='\t')
 
-
+        print(sample_names_toggle, 'sample_names_toggle')
         pca = PCA(n_components=3)
         principalComponents = pca.fit_transform(df_counts_pca.T)
         principalDf = pd.DataFrame(data=principalComponents, columns=['PCA1', 'PCA2', 'PCA3'])
@@ -1262,7 +1355,7 @@ def update_pca_and_barplot(indata, meta_dropdown_groupby, radio_text, number_of_
 
         if isinstance(lDropdown[0], (int, float)):
 
-            if radio_text:
+            if sample_names_toggle:
                 mode_ = 'markers+text'
             else:
                 mode_ = 'markers'#
@@ -1278,7 +1371,7 @@ def update_pca_and_barplot(indata, meta_dropdown_groupby, radio_text, number_of_
                 principalDf_temp = principalDf[principalDf[dropdown] == grp]
 
 
-                if radio_text:
+                if sample_names_toggle:
                     traces.append(
                         go.Scatter(x=principalDf_temp['PCA1'], y=principalDf_temp['PCA2'], marker={'size': 14},
                                    text=principalDf_temp.index, mode='markers+text', name=grp,
@@ -1472,7 +1565,7 @@ def export_de(n_clicks, indata, prefixes):
     State('intermediate-table', 'children'),
     State('program', 'value'),
     State('transformation', 'value'),
-    State('force_run', 'value'),
+    State('force_run', 'on'),
     State('rowsum','value'),
     State('design', 'value'),
     State('reference', 'value'))

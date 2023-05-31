@@ -16,19 +16,17 @@ reference = args[6]
 print(paste('design:', design, sep=' '))
 print(design)
 
-extract_variable <- function(formula_str) {
-  pattern <- ".*\\+\\s*([^\\s]+)\\s*$|^\\s*~\\s*([^\\s]+)\\s*$"
-  matches <- regmatches(formula_str, regexpr(pattern, formula_str, perl = TRUE))
-  
-  if (length(matches) > 0) {
-    matched_vars <- matches[[1]][-1]
-    variable_str <- matched_vars[!is.na(matched_vars)][1]
+extract_first_variable <- function(input_string) {
+  match <- regmatches(input_string, regexpr("(?<=~)\\w+(?=\\+)", input_string, perl = TRUE))
+
+  if (match == "") {
+    return(NULL)
   } else {
-    variable_str <- ""
+    return(match)
   }
-  
-  return(variable_str)
 }
+
+
 
 run_DE <-  function (indata, insample, rowm, design, outfile, reference) {
   #The insample table requires the column "SeqTag" and tissue
@@ -81,12 +79,14 @@ run_DE <-  function (indata, insample, rowm, design, outfile, reference) {
   #de_variable <- gsub(".*\\+(\\w+).*", "\\1", design)
   #de_variable <- gsub(".*\\+\\s*([^\\s]+)\\s*", "\\1", design)
   
-  if (!grepl("\\+", design)) {
-      de_variable <- strsplit(design, "~")[[1]][2]
-  } else {
-      de_varriable <- tail(strsplit(design, "\\+")[[1]], 1)
-  } 
+  #if (!grepl("\\+", design)) {
+  #    de_variable <- strsplit(design, "~")[[1]][2]
+  #} else {
+  #    de_variable <- tail(strsplit(design, "\\+")[[1]], 1)
+  #} 
   
+  de_variable <- extract_first_variable(design)
+   
   print('de_variable')
   print(de_variable)
   insample[[de_variable]] <- as.factor(insample[[de_variable]])

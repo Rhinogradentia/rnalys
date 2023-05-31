@@ -111,7 +111,7 @@ layout_page1 = html.Div(style={'backgroundColor': '#f5f5f5','padding': '25px'},
         html.Div([
             html.Div([
                 html.Div([
-                    html.H3('Select samples', style={'textAlign': 'left', 'padding': '5px'}),
+                    html.H3('Select samples', style={'textAlign': 'left', 'padding': '5px', 'margin-top': '10px'}),
 
                     html.Div([
                         html.P('Variable 1:', style={'width': '100px', 'display': 'flex', 'verticalAlign':"middle", 'padding':'5px'}),
@@ -187,7 +187,7 @@ layout_page1 = html.Div(style={'backgroundColor': '#f5f5f5','padding': '25px'},
                 ], className='row', style={'width': '40%','display': 'inline-block', 'margin':'10px'}),
 
                 html.Div([
-                    html.H3('Transformation & Normalization', style={'textAlign': 'left', 'padding': '10px'}),
+                    html.H3('Transformation & Normalization', style={'textAlign': 'left', 'padding': '10px', 'margin-top': '10px'}),
 
                     html.Div([
                            html.Div([
@@ -220,12 +220,13 @@ layout_page1 = html.Div(style={'backgroundColor': '#f5f5f5','padding': '25px'},
                         #)
 
                         html.Div([
-                            dcc.Checklist(
-                                id='force_run',
-                                options=[{'label': ' Force re-run', 'value': 'force_run'}],
-                                labelClassName='force_run'
-                            )
-                        ]),
+                            daq.BooleanSwitch('force_run', on=False, color='#9B51E0', label='Force re-run', labelPosition='left'),
+                            #dcc.Checklist(
+                            #    id='force_run',
+                            #    options=[{'label': ' Force re-run', 'value': 'force_run'}],
+                            #    labelClassName='force_run'
+                            #)
+                        ], style={'display':'inline-block', 'margin-top': '5px', 'margin-bottom': '5px'}),
                         html.Br(),
 
                         #dbc.Button("Submit", id='btn-selected_data_submit', color="primary", className="me-1",
@@ -234,10 +235,11 @@ layout_page1 = html.Div(style={'backgroundColor': '#f5f5f5','padding': '25px'},
                             [
                                 html.Div([
                                     dbc.Button('Submit', id='btn-selected_data_submit', n_clicks=0),
-                                ], style={'width':'40%'}),
-                                dbc.Spinner(html.Div(id="submit-done"),size='md', delay_hide=1, delay_show =1, show_initially=False),
-                            ], style={'width':'60%'}
-                        )
+                                ], style={'width': '40%', 'display': 'flex', 'flex-direction': 'column', 'margin-top': '10px'}),
+                                dbc.Spinner(html.Div(id="submit-done"), size='md', delay_hide=1, delay_show=1,
+                                            show_initially=False),
+                            ], style={'width': '60%', 'display':     'flex', 'flex-direction': 'column'}
+                        ),
                     ]),
                 ], className='row', style={'width': '50%', 'display': 'inline-block'})
 
@@ -287,9 +289,6 @@ layout_page1 = html.Div(style={'backgroundColor': '#f5f5f5','padding': '25px'},
                                      multi=True, value=start_genes)],style={'backgroundColor':'white','width': '70%', 'display': 'inline-block', 'verticalAlign':"middle"})
                     ]),
                 ], style={'backgroundColor':'white','display': 'inline-block', 'width':'70%', 'verticalAlign':"middle"}),
-
-
-
 
                 html.Div([
 
@@ -380,23 +379,20 @@ layout_page1 = html.Div(style={'backgroundColor': '#f5f5f5','padding': '25px'},
                     style={'width': '400px', 'textAlign': 'left'}
                 ),
                 html.Div([
-                    daq.BooleanSwitch(id='radio-text', on=False, label="Sample names",
-                                      labelPosition="top"),
+                    daq.BooleanSwitch(id='sample_names_toggle', on=False, label="Sample names",
+                                      labelPosition="left"),
                 ], style={'display': 'inline-block', 'margin-left': '100px'}),
 
             ], style={'display': 'flex', 'align-items': 'center', 'width': '100%', 'margin-top': 5}),
 
-            #dcc.RadioItems(id='radio_coloring', options=[{'label': j, 'value': j} for j in ['tissue', 'type', 'batch',
-            #                                                                                'Sex', 'gene-level']],
-            #               value='tissue', labelStyle={'display': 'inline-block'}),
 
 
 
-
-                dcc.Checklist(
-                    id='biplot_radio',
-                    options=[{'label': 'Biplot', 'value': 'biplot'}],
-                ),
+            dcc.Checklist(
+                id='biplot_radio',
+                options=[{'label': 'Biplot', 'value': 'biplot'}],
+                style={'display':'none'}
+            ),
 
 
 
@@ -418,8 +414,14 @@ layout_page1 = html.Div(style={'backgroundColor': '#f5f5f5','padding': '25px'},
             html.Div(id='clicked'),
 
             html.Div([
-                html.H4('PC correlation to variables')
-            ]),
+                html.H4('PC correlation to variables'),
+
+                html.Div([
+                    html.I(className="fas fa-question-circle fa-lg", id="qMark_pc_cor", style={'padding': '10px', 'margin-bottom': '10px'}),
+                    dbc.Tooltip("Columns with NaN values filtered", target="qMark_pc_cor", style={'font-size': 15,'width': '400px', 'height': '20px', 'padding': '10px'}),
+                ], style={'display': 'flex', 'align-items': 'center'}),
+
+            ], style={'display': 'flex', 'align-items': 'center', 'width': '600px'}),
             html.Div([
                 #html.Div([dcc.Graph(id='clustergram')]),
                 html.Div([dcc.Graph(id='pca_correlation')]),
@@ -451,7 +453,7 @@ layout_page1 = html.Div(style={'backgroundColor': '#f5f5f5','padding': '25px'},
                     ], style = {'display': 'flex', 'verticalAlign': "middle", 'width': '80%'}),
 
                     html.Div([
-                        html.P('Rowsum:',
+                        html.P('Row sum count >:',
                                style={'width': '10%', 'display': 'flex', 'verticalAlign': "middle", 'padding': '5px'}),
                         html.Div([
                             dbc.Input(id='rowsum', type='text', value=10,
@@ -505,11 +507,11 @@ layout_page1 = html.Div(style={'backgroundColor': '#f5f5f5','padding': '25px'},
                 html.Div(
                 [
                     #html.Div([
-                    dbc.Button('Run analysis', id='btn-DE', n_clicks=None),
+                    dbc.Button('Run analysis', id='btn-DE', n_clicks=None, style={'margin-right': '5px'}),
                     #], style={'width': '40%', 'padding': '5px'}),
 
-                    dbc.Button('Export table', id='btn_export'),
-                    dbc.Button('Export plot', id='btn_export_plot'),
+                    dbc.Button('Export table', id='btn_export', style={'margin-right': '5px'}),
+                    dbc.Button('Export plot', id='btn_export_plot', style={'margin-right': '5px'}),
                     dbc.Spinner(html.Div(id="submit-de-done"), size='md', delay_hide=1, delay_show=1,
                                 show_initially=False),
                 ], style={'width': '100%', 'padding':'5px'}
@@ -517,10 +519,7 @@ layout_page1 = html.Div(style={'backgroundColor': '#f5f5f5','padding': '25px'},
                 #html.Div([
 
                 #], style={'width': '100%', 'padding':'5px'})
-            ], style={'margin-top': 10, 'border':
-                                    '1px solid #C6CCD5', 'padding': 5,
-                                    'border-radius': '5px',
-                                    'backgroundColor':'white',}),
+            ], style={'margin-top': 10, 'padding': 5, 'backgroundColor':'white',}),
 
 
             html.Br(),
@@ -584,14 +583,14 @@ layout_page1 = html.Div(style={'backgroundColor': '#f5f5f5','padding': '25px'},
 
                 html.Div([
                     dbc.Button(id='sig_submit', n_clicks=0, children='Submit'),
-                ], style={'display': 'inline-block', 'verticalAlign':"middle"}),
+                ], style={'display': 'inline-block', 'verticalAlign':"middle", 'margin-left': '5px'}),
 
 
                 html.Div([dbc.Button('Add DE set', id='add_de_table')],
-                         style={'display': 'inline-block', 'verticalAlign':"middle"}),
+                         style={'display': 'inline-block', 'verticalAlign':"middle", 'margin-left': '5px'}),
                 html.Div([
                     dbc.Button('clear DE set', id='clear_de_table')],
-                        style={'display': 'inline-block', 'verticalAlign':"middle"}),
+                        style={'display': 'inline-block', 'verticalAlign':"middle", 'margin-left': '5px'}),
             ]),
 
             #TODO remake table to interactive table
@@ -623,39 +622,41 @@ layout_page1 = html.Div(style={'backgroundColor': '#f5f5f5','padding': '25px'},
         html.Br(),
 
         html.Div([
-            dbc.Button('Enrichr', id='btn-enrichr', n_clicks=None),
-        ]),
 
-        html.Div([
-            dbc.Tabs(
-                [
-                    dbc.Tab(label="GO: Biological process 2018 Up ", tab_id="tab-1"),
-                    dbc.Tab(label="GO: Biological process Down", tab_id="tab-2"),
-                    dbc.Tab(label="EGO: Cellular Component 2018 Up", tab_id="tab-3"),
-                    dbc.Tab(label="GO: Cellular Component 2018 Down", tab_id="tab-4"),
-                    dbc.Tab(label="GO: Molecular function 2018 Up", tab_id="tab-5"),
-                    dbc.Tab(label="GO: Molecular function 2018 Down", tab_id="tab-6"),
-                    dbc.Tab(label="Kegg 2016 Up", tab_id="tab-7"),
-                    dbc.Tab(label="Kegg 2016 Down", tab_id="tab-8"),
-                ]   ,
-                id="enrichr_tabs",
-                active_tab="tab-1",
-            ),
+            html.Div([
+                dbc.Button('Enrichr', id='btn-enrichr', n_clicks=None),
+            ]),
 
-            html.Div(id="enrichr_content"),
-        ], style={'margin-top': 5, 'padding': 5}),
+            html.Div([
+                dbc.Tabs(
+                    [
+                        dbc.Tab(label="GO: Biological process 2018 Up ", tab_id="tab-1"),
+                        dbc.Tab(label="GO: Biological process Down", tab_id="tab-2"),
+                        dbc.Tab(label="EGO: Cellular Component 2018 Up", tab_id="tab-3"),
+                        dbc.Tab(label="GO: Cellular Component 2018 Down", tab_id="tab-4"),
+                        dbc.Tab(label="GO: Molecular function 2018 Up", tab_id="tab-5"),
+                        dbc.Tab(label="GO: Molecular function 2018 Down", tab_id="tab-6"),
+                        dbc.Tab(label="Kegg 2016 Up", tab_id="tab-7"),
+                        dbc.Tab(label="Kegg 2016 Down", tab_id="tab-8"),
+                    ]   ,
+                    id="enrichr_tabs",
+                    active_tab="tab-1",
+                ),
 
-
-        html.Div(id='Enrichr_GO_bp_up_ph', style={'display': 'none'}),
-        html.Div(id='Enrichr_GO_bp_dn_ph', style={'display': 'none'}),
-        html.Div(id='Enrichr_GO_cell_up_ph', style={'display': 'none'}),
-        html.Div(id='Enrichr_GO_cell_dn_ph', style={'display': 'none'}),
-        html.Div(id='Enrichr_GO_mf_up_ph', style={'display': 'none'}),
-        html.Div(id='Enrichr_GO_mf_dn_ph', style={'display': 'none'}),
-        html.Div(id='Enrichr_kegg_up_ph', style={'display': 'none'}),
-        html.Div(id='Enrichr_kegg_dn_ph', style={'display': 'none'}),
+                html.Div(id="enrichr_content"),
+            ], style={'margin-top': 5, 'padding': 5}),
 
 
+            html.Div(id='Enrichr_GO_bp_up_ph', style={'display': 'none'}),
+            html.Div(id='Enrichr_GO_bp_dn_ph', style={'display': 'none'}),
+            html.Div(id='Enrichr_GO_cell_up_ph', style={'display': 'none'}),
+            html.Div(id='Enrichr_GO_cell_dn_ph', style={'display': 'none'}),
+            html.Div(id='Enrichr_GO_mf_up_ph', style={'display': 'none'}),
+            html.Div(id='Enrichr_GO_mf_dn_ph', style={'display': 'none'}),
+            html.Div(id='Enrichr_kegg_up_ph', style={'display': 'none'}),
+            html.Div(id='Enrichr_kegg_dn_ph', style={'display': 'none'}),
+
+        ], style={'backgroundColor':'white', 'display': 'flex', 'margin': 'auto', 'border': '1px solid #C6CCD5', 'padding': '20px', 'border-radius': '5px','justify-content': 'space-between', 'margin-top': 5, 'padding': 5}),
     ]#, style={}
 
 )
