@@ -80,6 +80,8 @@ if os.path.isfile('data/datasets.txt'):
 else:
     os.system('touch data/datasets.txt')
 
+dataset_file_path = 'data/datasets/datasets.csv'
+
 
 
 layout_page1 = html.Div(style={'backgroundColor': '#f5f5f5','padding': '25px'},
@@ -97,8 +99,9 @@ layout_page1 = html.Div(style={'backgroundColor': '#f5f5f5','padding': '25px'},
         html.Div([
             html.Div([
                 html.P('Load dataset:', style={'width': '100px', 'display': 'flex', 'verticalAlign': "middle", 'padding': '2px', 'margin-top': '15px'}),
-                html.Div([
-                    dcc.Dropdown(id='paper', options=[{'label': j, 'value': j} for j in lPapers], value='New'),
+                html.Div(id='dataset_loader_start', children=[
+                    #html.Div(id='dataset_loader_start', style={'display': 'none'}),
+                    dcc.Dropdown(id='datasets', value='New'),
                 ], style={'width': '400px', 'display': 'inline-block'}),
                 html.Div([
                     html.I(className="fas fa-question-circle fa-lg", id="target", style={'padding': '10px'}),
