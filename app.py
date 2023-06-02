@@ -28,6 +28,7 @@ from sklearn.decomposition import PCA
 from demos import dash_reusable_components as drc
 from layout_content import layout_index, layout_page1
 from dash.dependencies import Input, Output, State
+from datetime import datetime
 
 FONT_AWESOME = "https://use.fontawesome.com/releases/v5.10.2/css/all.css"
 
@@ -105,17 +106,20 @@ def generate_random_string(length=7):
     random_string = ''.join(random.choices(characters, k=length))
     return random_string
 
-def write_dataset(lSamples, id_name=None):
+def write_dataset(lSamples, lExclude, id_name=None):
     # Generate a random filename
     dataset_file_path = 'data/datasets/datasets.csv'
     sample_names = ' '.join(lSamples)
+    exclude_names = ' '.join(lExclude)
     outdir = 'data/datasets/'
+
     if not os.path.exists(outdir):
         # If the directory doesn't exist, create it
         os.makedirs(outdir)
 
     df_new = pd.DataFrame({
         'Sample Names': [sample_names],
+        'Exclude Names': [exclude_names],
         'ID Name': [id_name]
     })
 
@@ -133,8 +137,6 @@ def write_dataset(lSamples, id_name=None):
 def load_dataset(dataset_name):
     dataset_file_path = 'data/datasets/datasets.csv'
 
-    # List all files in the directory
-
     if os.path.isfile(dataset_file_path):
 
         df = pd.read_csv(dataset_file_path, index_col=False)
@@ -142,14 +144,14 @@ def load_dataset(dataset_name):
 
         # If there is a matching row, return the Sample Names
         if not matching_row.empty:
-            print(matching_row['Sample Names'].values[0])
-            return matching_row['Sample Names'].values[0]
+            #print(matching_row['Sample Names'].values[0])
+            return matching_row['Sample Names'].values[0], matching_row['Exclude Names'].values[0]
 
         # If there is no matching row, return None
         return None
 
     else:
-        df = pd.DataFrame(columns=['Sample Names', 'ID Name'])
+        df = pd.DataFrame(columns=['Sample Names', 'Exclude Names', 'ID Name'])
         # Write the DataFrame to 'data/datasets/datasets.csv'
         df.to_csv(dataset_file_path, index=False)
         return None
@@ -180,14 +182,28 @@ def search_session(sample_string, transformation, rm_confounding):
 
     session_file_path = 'data/datasets/session_file.txt'
     outdir = 'data/datasets/'
-    # List all files in the directory
+
     if not os.path.exists(outdir):
-        # If the directory doesn't exist, create it
         os.makedirs(outdir)
+
+    if not os.path.isfile(session_file_path):
+        df = pd.DataFrame(columns=['Sample Names', 'ID Name', 'Transformation', 'rm_confounding', 'File String'])
+        df.to_csv(session_file_path, index=False)
 
     df = pd.read_csv(session_file_path)
 
     # Check if the given values match those in the DataFrame
+    print(rm_confounding)
+    print(' '.join(sample_string))
+    print(transformation)
+
+    #if rm_confounding == None:
+    #    rm_confounding = np.nan
+
+    print(df['rm_confounding'])
+    print('rm_confounding:', df['rm_confounding'] == rm_confounding)
+
+
     matching_rows = df[
         (df['Sample Names'] == ' '.join(sample_string)) &
         (df['rm_confounding'] == rm_confounding) &
@@ -414,20 +430,21 @@ def switch_tab(at):
     Output('dataset_name_placeholder', 'children'),
     Input('btn_save_dataset', 'n_clicks_timestamp'),
     State('selected_data', 'children'),
-    State('save_dataset_name', 'value'))
-def save_dataset(n_clicks, selected_data, dataset_name):
+    State('save_dataset_name', 'value'),
+    State('exclude_dropdown', 'value'))
+def save_dataset(n_clicks, selected_data, dataset_name, lExclude):
     if n_clicks is None:
         raise PreventUpdate
     if dataset_name is None:
         raise PreventUpdate
 
     datasets = json.loads(selected_data)
-    lSamples = json.loads(datasets['full_name'])
+    lSamples = json.loads(datasets['samples'])
     dataset_name = dataset_name
     #print([dataset_name, ' '.join(lSamples)])
     #save_dataset_to_file([dataset_name, ' '.join(lSamples)])
     #write_sample_names_to_file(lSamples, 'test')
-    write_dataset(lSamples, id_name=dataset_name)
+    write_dataset(lSamples, lExclude, id_name=dataset_name)
 
 @app.callback(Output('page-content', 'children'),
               [Input('url', 'pathname')])
@@ -463,7 +480,7 @@ def table_type(df_column):
         return 'any'
 
 @app.callback([Output('exclude_list', 'children')],
-              [Input('exclude', 'value')])
+              [Input('exclude_dropdown', 'value')])
 def exclude_helper(exclude, verbose=0):
     if verbose == 1:
         print('!!!!!!!!!!!!!!!!!!!!')
@@ -571,7 +588,7 @@ def select_var_div(df_info):
     else:
         return {'display':'inline-block'}
 
-@app.callback(Output('exclude', 'options'),
+@app.callback(Output('exclude_dropdown', 'options'),
               Output('rm_confounding', 'options'),
               Output('meta_dropdown', 'options'),
               Output('gene_list', 'options'),
@@ -637,16 +654,33 @@ def select_helper(dataset, data, df_info, variable1, variable2, variable3):
         raise PreventUpdate
 '''
 
-@app.callback(Output('exclude', 'value'),
-              Output('variable3_selected_dropdown', 'value'),
-               Output('variable1_selected_dropdown', 'value'),
+@app.callback(Output('exclude_dropdown', 'value'),
+              Output('variable1_selected_dropdown', 'value'),
                Output('variable2_selected_dropdown', 'value'),
-              Input('datasets', 'value'))
-def select_helper(dataset):
-    #full_name : sample_name + variable1
-    full_name = load_dataset(dataset)
-    print(full_name)
-    return [], [], [], []
+               Output('variable3_selected_dropdown', 'value'),
+              Input('datasets', 'value'),
+              #State('exclude_list', 'children'),
+              State('df_info', 'data'),
+              State('variable_selection1_store', 'data'),
+              State('variable_selection2_store', 'data'),
+              State('variable_selection3_store', 'data'),
+              PreventUpdate=True)
+def select_helper(dataset, df_info, variable1, variable2, variable3):
+
+    if dataset != 'New':
+        df_info = pd.read_json(df_info, orient='split')
+        lSamples, lExclude = load_dataset(dataset)
+        lSamples = lSamples.split(' ')
+        lExclude = lExclude.split(' ')
+        df_info_temp = df_info.loc[lSamples]
+        var1_uniq = df_info_temp[variable1].unique()
+        var2_uniq = df_info_temp[variable2].unique()
+        var3_uniq = df_info_temp[variable3].unique()
+
+        return lExclude, var1_uniq, var2_uniq, var3_uniq
+
+    else:
+        return [], [], [], []
 
 
 @app.callback(
@@ -665,24 +699,33 @@ def export_plot(n_clicks, indata, prefixes):
             #dTranslate = dict(df_symbol.loc[df_degenes.index]['hgnc_symbol'])
             #print(df_degenes.index)
             df_degenes['hgnc'] = [dTranslate.get(x, x) for x in df_degenes.index]
-            prefixes = json.loads(prefixes)
-            lTotal = json.loads(prefixes['prefixes'])
-            sTotal = '_'.join(lTotal)
-            sTotal_deplot = sTotal + '_for_DEplot.tab'
-            df_degenes.to_csv('data/generated/%s' %sTotal_deplot, sep='\t')
-            sTotal = sTotal + '_volcano.R'
+
+            file_string = json.loads('file_string')
+            #prefixes = json.loads(prefixes)
+            #lTotal = json.loads(prefixes['prefixes'])
+            #sTotal = '_'.join(lTotal)
+            #sTotal = sTotal + '_for_DEplot.tab'
+
+            outdir = 'data/generated/'
+            de_file_for_plot = file_string + '_for_DEplot.tab'
+
+
+            de_file_for_plot_path = outdir + de_file_for_plot
+
+            df_degenes.to_csv('data/generated/%s' %de_file_for_plot_path, sep='\t')
+            volcano_file = outdir+ file_string + '_volcano.R'
 
             # Read in the file
             with open('./data/templates/volcano_template.R', 'r') as file:
                 filedata = file.read()
 
             # Replace the target string
-            filedata = filedata.replace('infile_holder', sTotal_deplot)
+            filedata = filedata.replace('infile_holder', de_file_for_plot_path)
 
             # Write the file out again
-            with open('./data/scripts/%s' %sTotal, 'w') as file:
+            with open('./data/scripts/%s' %volcano_file, 'w') as file:
                 file.write(filedata)
-            return ['Created plot file %s' %sTotal]
+            return ['Created plot file %s' %volcano_file]
 
         else:
             print('Run DE analysis first')
@@ -693,9 +736,9 @@ def export_plot(n_clicks, indata, prefixes):
 @app.callback(
     [Output('selected_data', 'children'),
     Output('alert_selection', 'hide')],
-    [Input('exclude', 'value'),
+    [Input('exclude_dropdown', 'value'),
     Input('transformation', 'value'),
-     Input('variable1_selected_dropdown', 'value'),
+    Input('variable1_selected_dropdown', 'value'),
     Input('variable2_selected_dropdown', 'value'),
     Input('variable3_selected_dropdown', 'value'),
     Input('variable_selection1_store', 'data'),
@@ -706,7 +749,7 @@ def export_plot(n_clicks, indata, prefixes):
 def select_info(lExclude, transformation, variable1_dropdown, variable2_dropdown, variable3_dropdown, variable1, variable2, variable3, df_info):
     #variable_selection1_store = column_name_variable1 = tissue
     #variable1 = LV RV etc
-    if variable1_dropdown is not None and variable2_dropdown is not None and variable3_dropdown is not None:
+    if variable1_dropdown is not None and variable2_dropdown is not None and variable3_dropdown is not None and df_info is not None:
 
         df_info = pd.read_json(df_info, orient='split')
 
@@ -716,14 +759,16 @@ def select_info(lExclude, transformation, variable1_dropdown, variable2_dropdown
         df_info_temp = df_info_temp.loc[df_info_temp[variable2].isin(variable2_dropdown),]
         df_info_temp = df_info_temp.loc[df_info_temp[variable3].isin(variable3_dropdown),]
 
-        if lExclude is not None:
-            df_info_temp = df_info_temp.loc[~df_info_temp['id_tissue'].isin(lExclude), ]
+        #lExclude = lExclude.split()
+        #print(lExclude)
 
-        #add full_name
+        if len(lExclude) > 0:
+            #df_info_temp = df_info_temp.loc[~df_info_temp['id_tissue'].isin(lExclude), ]
+            print(lExclude)
+            df_info_temp = df_info_temp[~df_info_temp.index.isin(lExclude)]
 
         #df_info_temp.index = df_info_temp[[variable1, variable1]].apply(lambda x: '_'.join(x), axis=1)
-        df_info_temp['full_name'] = [x+'_'+df_info_temp.loc[x, variable1] for x in df_info_temp.index]
-
+        #df_info_temp['full_name'] = [x+'_'+df_info_temp.loc[x, variable1] for x in df_info_temp.index]
 
         datasets = {variable1: json.dumps(df_info_temp[variable1].unique().tolist()),
                     'transformation': transformation,
@@ -731,7 +776,7 @@ def select_info(lExclude, transformation, variable1_dropdown, variable2_dropdown
                     variable3: json.dumps(df_info_temp[variable3].unique().tolist()),
                     'exclude': json.dumps(lExclude),
                     'samples': json.dumps(df_info_temp.index.to_list()),
-                    'full_name': json.dumps(df_info_temp['full_name'].to_list()),
+                    #'full_name': json.dumps(df_info_temp['full_name'].to_list()),
                     'empty': '0'}
 
         return json.dumps(datasets), ''
@@ -893,11 +938,23 @@ def add_de_set(btn_add: int, btn_clear: int, de_table: List[dict],
 
     return json.dumps(dataset), data
 
+background_pipe = {
+            'width': '15px',
+            'height': '40px',
+            'backgroundColor': '#4CB5F5',
+            'z-index': '1',
+            'left': '20%',
+            'position': 'relative',
+        }
+
 ##main table: intermediate-table
 @app.callback(
     [Output('intermediate-table', 'children'),
      Output('alert_main_table', 'hide'),
-     Output('submit-done', 'children')],
+     Output('submit-done', 'children'),
+     Output('select_to_explore_block', 'style'),
+     Output('sample_to_pca_block', 'style'),
+     Output('pca_to_de_block', 'style')],
     Input('btn-selected_data_submit', 'n_clicks'),
     State('selected_data', 'children'),
     State('rm_confounding', 'value'),
@@ -913,6 +970,9 @@ def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_r
     if n_clicks is 0:
         raise PreventUpdate
     else:
+
+
+
         if df_counts is not None:
             df_counts = pd.read_json(df_counts, orient='split')
             df_info = pd.read_json(df_info, orient='split')
@@ -921,14 +981,10 @@ def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_r
                 cmd = 'mkdir %s' % out_folder
                 os.system(cmd)
 
-            #print(selected_data)
             datasets = json.loads(selected_data)
-
-
-
             empty = json.loads(datasets['empty'])
-            if empty != '0':
 
+            if empty != '0':
                 var1_dropdown = json.loads(datasets[variable_selection1])
                 var2_dropdown = json.loads(datasets[variable_selection2])
                 var3_dropdown = json.loads(datasets[variable_selection3])
@@ -958,24 +1014,25 @@ def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_r
                 if fulltext:
                     df_counts_raw = df_counts[df_info_temp.index]
                     #df_info_temp[['id_tissue', variable_selection2]].apply(lambda x: '_'.join(x), axis=1)
-                    df_info_temp.index = df_info_temp['full_name']
+                    df_info_temp.index = df_info_temp['samples']
                     # Change names in count files
                     df_counts_raw.columns = df_info_temp.index
                 else:
                     df_counts_raw = df_counts[df_info_temp.index]
 
-                if exclude:
-                    exclude = [x.split('SLL')[1] for x in exclude]
+                if rm_confounding is None:
+                    rm_confounding = 'None'
+
+                file_string = search_session(lSamples, transformation, rm_confounding)
+                print(file_string, 'file_string')
+
+                if file_string is None:
+                    file_string = generate_random_string()
                 else:
-                    exclude = ['']
-
-
-                #(sample_string, transformation, rm_confounding):
-                file_string = search_session(lSamples, transformation, rm_confounding) or generate_random_string()
+                    write_session_to_file(list(df_info_temp.index), rm_confounding, transformation, file_string)
 
                 name_counts_for_pca = './data/generated/' + file_string + '_counts.tab'
                 name_meta_for_pca = './data/generated/' + file_string + '_meta.tab'
-
 
                 df_counts_raw.to_csv(name_counts_for_pca, sep='\t')
                 df_info_temp.to_csv(name_meta_for_pca, sep='\t')
@@ -984,7 +1041,7 @@ def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_r
                 cmd = 'Rscript ./functions/normalize_vsd_rlog_removebatch2.R %s %s %s %s %s' % (
                     name_counts_for_pca, name_meta_for_pca, rm_confounding, name_out, transformation)
 
-                if not search_files_for_samples(list(df_info_temp.index), performance, transformation):
+                if not search_session(list(df_info_temp.index), rm_confounding, transformation):
                     print(cmd)
                     os.system(cmd)
                 else:
@@ -994,16 +1051,6 @@ def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_r
                     else:
                         print('Loading file: %s' % name_out)
 
-                # if not os.path.isfile(name_out):
-                #    print(cmd)
-                #    os.system(cmd)
-                # else:
-                #    if force_run:
-                #        print(cmd)
-                #        os.system(cmd)
-                #    else:
-                #        print('Loading file: %s' %name_out)
-
                 df_counts_temp_norm = pd.read_csv(name_out, sep='\t', index_col=0)
 
                 datasets = {'counts_norm': df_counts_temp_norm.to_json(orient='split', date_format='iso'),
@@ -1012,14 +1059,14 @@ def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_r
                             'counts_raw': df_counts_raw.to_json(orient='split', date_format='iso'),
                             'counts_raw_file_name': json.dumps(name_counts_for_pca),
                             'perf_file': json.dumps(name_out),
-                            'prefixes': json.dumps(lTotal),
-                            'prefix_sub': json.dumps(sPrefix_tissue_batch_type)}
+                            'file_string': json.dumps(file_string)}
+                            #'prefix_sub': json.dumps(sPrefix_tissue_batch_type)}
 
-                outf = '_'.join(lTotal)
 
-            alert_mess = 'test out'
 
-            return json.dumps(datasets), alert_mess, ''
+            alert_mess = 'Data loaded successfully.'
+
+            return json.dumps(datasets), alert_mess, '', background_pipe, background_pipe, background_pipe
 
         else:
             raise PreventUpdate
@@ -1436,7 +1483,8 @@ def populate_dataset_load(invalue):
 @app.callback(
     [Output('DE-table', 'data'),
      Output('pvalue', 'children'),
-     Output('number_of_degenes', 'children')],
+     Output('number_of_degenes', 'children'),
+     Output('de_to_enrichr_block', 'style'),],
     [Input('sig_submit', 'n_clicks')],
     [State('volcanoplot-input', 'value'),
      State('intermediate-DEtable', 'children'),
@@ -1476,7 +1524,7 @@ def update_de_table(n_clicks, effects, indata, sig_value, basemean):
             df_degenes['hgnc'] = [dTranslate.get(x, x) for x in df_degenes.index]
             df_degenes.to_csv('data/generated/%s' %name, sep='\t')
 
-            return df_degenes.to_dict('records'), sig_value, number_of_degenes
+            return df_degenes.to_dict('records'), sig_value, number_of_degenes, background_pipe
 
 
 @app.callback(
@@ -1493,14 +1541,17 @@ def export_de(n_clicks, indata, prefixes):
             datasets = json.loads(indata)
             df_degenes = pd.read_json(datasets['de_table'], orient='split')
             df_degenes['hgnc'] = [dTranslate.get(x, x) for x in df_degenes.index]
-            prefixes = json.loads(prefixes)
-            lTotal = json.loads(prefixes['prefixes'])
-            sTotal = '_'.join(lTotal)
-            sTotal = sTotal + '_for_DEplot.tab'
-            df_degenes.to_csv('data/generated/%s' %sTotal, sep='\t')
-            print('Written to file: %s' %sTotal)
+            file_string = json.loads('file_string')
+            #prefixes = json.loads(prefixes)
+            #lTotal = json.loads(prefixes['prefixes'])
+            #sTotal = '_'.join(lTotal)
+            #sTotal = sTotal + '_for_DEplot.tab'
+            de_file_for_plot = file_string + '_for_DEplot.tab'
 
-            return ['Written to file: %s' %sTotal]
+            df_degenes.to_csv('data/generated/%s' %de_file_for_plot, sep='\t')
+            print('Written to file: %s' %de_file_for_plot)
+
+            return ['Written to file: %s' %de_file_for_plot]
 
         else:
             print('Run DE analysis first')
@@ -1526,33 +1577,45 @@ def run_DE_analysis(n_clicks, indata, program, transformation, force_run, rowsum
     else:
         datasets = json.loads(indata)
         #df_meta_temp = pd.read_json(datasets['meta'], orient='split')
-
+        outdir = './data/generated/'
         name_counts = json.loads(datasets['counts_raw_file_name'])
-        lTotal = json.loads(datasets['prefixes'])
-        sTotal = '_'.join(lTotal)
-        lTotalDE = lTotal + [program]
-        sTotalDE = sTotal + '_' + program
+        file_string = json.loads(datasets['file_string'])
+        logfile = outdir + file_string + '_DE.log'
 
-        name_meta = './data/generated/' + ''.join(lTotal) + '_meta.tab'
-        name_out = './data/generated/' + ''.join(lTotalDE) + '_DE.tab'
-        print(sTotal)
+        data = {
+            'program': [program],
+            'transformation': [transformation],
+            'rowsum': [rowsum],
+            'design': [design],
+            'reference': [reference]
+        }
+        df_new = pd.DataFrame(data)
+        df_new['timestamp'] = datetime.now()
+
+        if os.path.isfile(logfile):
+            df_log = pd.read_csv(logfile)
+            df_log = df_log.append(df_new, ignore_index=True)
+        else:
+            # if logfile does not exist, use the new dataframe
+            df_log = df_new
+
+        df_log.to_csv(logfile, index=False)
+
+        #lTotal = json.loads(datasets['prefixes'])
+        #sTotal = '_'.join(lTotal)
+        #file_string_program = lTotal + [program]
+        #sTotalDE = sTotal + '_' + program
+
+        name_meta = './data/generated/' + ''.join(file_string) + '_meta.tab'
+        name_out = './data/generated/' + ''.join(file_string) + '_DE.tab'
         if program == 'DESeq2':
             cmd = 'Rscript ./functions/run_deseq2_v2.R %s %s %s %s %s %s' % (
-                name_counts, name_meta, rowsum, design, name_out, reference)
+                name_counts, name_meta, rowsum, design, reference, name_out)
 
         elif program == 'edgeR':
             cmd = 'Rscript ./functions/run_edgeR.R %s %s %s %s %s' % (name_counts, name_meta, design, reference,
                                                                       name_out)
-
-            #if sTotal.count('@') > 1:
-            #    cmd = 'Rscript ./functions/run_edgeR.R %s %s %s %s %s' % (name_counts, name_meta, 'batch', reference,
-            #                                                              name_out)
-            #    print('edgeR batch')
-            #else:
-            #    cmd = 'Rscript ./functions/run_edgeR.R %s %s %s %s %s' % (name_counts, name_meta, 'none', reference,
-            #                                                              name_out)
-            #    print('edgeR no batch')
-
+        '''
         elif program == 'limma':
             if sTotal.count('@') > 1:
                 cmd = 'Rscript ./functions/run_limma_de.R %s %s %s %s %s' % (
@@ -1562,8 +1625,10 @@ def run_DE_analysis(n_clicks, indata, program, transformation, force_run, rowsum
                 cmd = 'Rscript ./functions/run_limma_de.R %s %s %s %s %s' % (
                 name_counts, name_meta, 'none', reference,
                 name_out)
-        else:
-            print('ERROR radio_de')
+        '''
+
+        #else:
+        #    print('ERROR radio_de')
 
         if not os.path.isfile(name_out):
             print(cmd)
@@ -1587,7 +1652,7 @@ def run_DE_analysis(n_clicks, indata, program, transformation, force_run, rowsum
         dTranslate = dict(df_symbol.loc[overlap_genes]['hgnc_symbol'])
 
         df_degenes['hgnc'] = [dTranslate.get(x, x) for x in df_degenes.index]
-        datasets = {'de_table': df_degenes.to_json(orient='split'), 'DE_type': program, 'title': sTotalDE}
+        datasets = {'de_table': df_degenes.to_json(orient='split'), 'DE_type': program, 'title': file_string}
 
         print('DE done')
         return json.dumps(datasets), 'temp', ''
@@ -1657,7 +1722,8 @@ def enrichr_tab_out(in1):
     Output('Enrichr_GO_mf_up_ph', 'figure'),
     Output('Enrichr_GO_mf_dn_ph', 'figure'),
     Output('Enrichr_kegg_up_ph', 'figure'),
-    Output('Enrichr_kegg_dn_ph', 'figure')],
+    Output('Enrichr_kegg_dn_ph', 'figure'),
+    Output('submit_done_enrichr', 'children')],
     Input('btn-enrichr', 'n_clicks'),
     State('intermediate-DEtable', 'children'),
     State('DE-table', 'data'),
@@ -1668,17 +1734,17 @@ def enrichr_up(n_clicks, indata, indata_de, sig_value):
     else:
         datasets = json.loads(indata)
         df_degenes = pd.DataFrame.from_dict(indata_de)
-        #df_degenes = pd.read_json(datasets['de_table'], orient='split')
+
         radiode = datasets['DE_type']
-        sTotalDE = datasets['title']
-        #print(df_degenes.head())
+        file_string = datasets['title']
+        #
         l_databases = ['GO_Biological_Process_2018', 'GO_Cellular_Component_2018', 'GO_Molecular_Function_2018',
                       'KEGG_2016']
         lOutput = []
         lUpDn = ['up', 'dn']
         out_folder = 'data/generated/enrichr'
 
-        prefix = os.path.join(out_folder, sTotalDE)
+        prefix = os.path.join(out_folder, file_string)
 
         if not os.path.isdir(out_folder):
             cmd = 'mkdir %s' % out_folder
@@ -1757,7 +1823,7 @@ def enrichr_up(n_clicks, indata, indata_de, sig_value):
 
                 lOutput.append(output)
 
-    return lOutput[0], lOutput[1], lOutput[2], lOutput[3], lOutput[4], lOutput[5], lOutput[6], lOutput[7]
+    return lOutput[0], lOutput[1], lOutput[2], lOutput[3], lOutput[4], lOutput[5], lOutput[6], lOutput[7], ''
 
 if __name__ == "__main__":
     #app.run_server(debug=True, host='130.238.239.158')

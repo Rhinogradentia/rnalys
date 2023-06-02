@@ -8,13 +8,13 @@ indata = args[1]
 insample = args[2]
 rowm = args[3]
 design = args[4]
-outfile = args[5]
-reference = args[6]
+reference = args[5]
+outfile = args[6]
 
 #print(indata)
 #print(insample)
-print(paste('design:', design, sep=' '))
-print(design)
+#print(paste('design:', design, sep=' '))
+#print(design)
 
 extract_first_variable <- function(input_string) {
   match <- regmatches(input_string, regexpr("(?<=~)\\w+(?=\\+)", input_string, perl = TRUE))
@@ -53,18 +53,18 @@ run_DE <-  function (indata, insample, rowm, design, outfile, reference) {
   #keepRows <- rowSums(indata) >= rowm
   #indata <- indata[rowSums(indata >= 25) >= 0.9*dim(indata)[2],]
   #indata <- indata[keepRows,]
-  print(1) 
+  #print(1) 
   dds_pre <- DESeqDataSetFromMatrix(countData = indata, colData = insample, design=as.formula(design))
   dds_pre <- DESeq(dds_pre)
   indata_filter = indata[rowMedians(counts(dds_pre, normalize=T)) >= 10,]
-  print(2)
+  #print(2)
   #indata = indata[apply(indata,1,median)>=20,]
   
-  print('indata after fitlering')
-  print('before filter:')
-  print(dim(indata))
-  print('after filter:')
-  print(dim(indata_filter))
+  #print('indata after fitlering')
+  #print('before filter:')
+  #print(dim(indata))
+  #print('after filter:')
+  #print(dim(indata_filter))
   #print(head(indata_filter))
   
   
@@ -87,8 +87,8 @@ run_DE <-  function (indata, insample, rowm, design, outfile, reference) {
   
   de_variable <- extract_first_variable(design)
    
-  print('de_variable')
-  print(de_variable)
+  #print('de_variable')
+  #print(de_variable)
   insample[[de_variable]] <- as.factor(insample[[de_variable]])
   insample[[de_variable]] <- relevel(factor(insample[[de_variable]]), ref=reference)
 

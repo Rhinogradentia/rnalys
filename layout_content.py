@@ -57,7 +57,7 @@ def b64_image(image_filename):
 #df_meta_combined = pd.read_csv(df_meta_combined_file, sep='\t', index_col=0)
 #available_tissues = df_meta_combined['tissue'].unique()
 
-start_genes = ['LEP', 'ADIPOQ', 'RARRES2', 'IL6', 'CCL2', 'SERPINE1', 'RBP4', 'NAMPT', 'ITLN1', 'GRN']
+start_genes = ['LEP', 'ADIPOQ', 'IL6', 'CCL2', 'RBP4', 'NAMPT', 'ITLN1']
 
 #for volcano init
 columns = ['Ensembl', 'hgnc', 'baseMean', 'log2FoldChange', 'pvalue', 'padj']
@@ -101,7 +101,7 @@ layout_page1 = html.Div(style={'backgroundColor': '#f5f5f5','padding': '25px'},
                 html.P('Load dataset:', style={'width': '100px', 'display': 'flex', 'verticalAlign': "middle", 'padding': '2px', 'margin-top': '15px'}),
                 html.Div(id='dataset_loader_start', children=[
                     #html.Div(id='dataset_loader_start', style={'display': 'none'}),
-                    dcc.Dropdown(id='datasets', value='New'),
+                    dcc.Dropdown(id='datasets', value='New', placeholder='New'),
                 ], style={'width': '400px', 'display': 'inline-block'}),
                 html.Div([
                     html.I(className="fas fa-question-circle fa-lg", id="target", style={'padding': '10px'}),
@@ -111,13 +111,15 @@ layout_page1 = html.Div(style={'backgroundColor': '#f5f5f5','padding': '25px'},
         ], style={'display': 'flex', 'align-items': 'center', 'width': '100%'}),
 
         html.P(id='dataset_name_placeholder'),
+
+        #SELECT SAMPLES DIV
         html.Div([
             html.Div([
                 html.Div([
                     html.H3('Select samples', style={'textAlign': 'left', 'padding': '5px', 'margin-top': '10px'}),
 
                     html.Div([
-                        html.P('Variable 1:', style={'width': '100px', 'display': 'flex', 'verticalAlign':"middle", 'padding':'5px'}),
+                        html.P('Variable 1:', style={'width': '120px', 'display': 'flex', 'verticalAlign':"middle", 'padding':'5px'}),
 
                         html.Div([
                             dcc.Dropdown(
@@ -130,17 +132,17 @@ layout_page1 = html.Div(style={'backgroundColor': '#f5f5f5','padding': '25px'},
                     ], style={'display': 'flex', 'verticalAlign':"middle", 'width': '80%'}),
 
                     html.Div([
-                        html.P('Variable 2:',style={'width': '100px', 'display': 'flex', 'verticalAlign':"middle", 'padding':'5px'}),
+                        html.P('Variable 2:',style={'width': '120px', 'display': 'flex', 'verticalAlign':"middle", 'padding':'5px'}),
                         html.Div([
                             dcc.Dropdown(
                             id='variable2_selected_dropdown',
-                            value=[''],
+                            #value=[''],
                             multi=True)
                         ], style={'display': 'inline-block', 'width':'100%', 'verticalAlign':"middle"})
                     ], style={'display': 'flex', 'verticalAlign':"middle", 'width': '80%'}),
                     #
                     html.Div([
-                        html.P('Batch:', style={'width': '100px', 'display': 'flex', 'verticalAlign':"middle", 'padding':'5px'}),
+                        html.P('Batch:', style={'width': '120px', 'display': 'flex', 'verticalAlign':"middle", 'padding':'5px'}),
                         html.Div([
                             dcc.Dropdown(
                             id='variable3_selected_dropdown',
@@ -151,10 +153,10 @@ layout_page1 = html.Div(style={'backgroundColor': '#f5f5f5','padding': '25px'},
 
                     html.Div([
                         html.Div(id='exclude_list', style={'display': 'none'}),
-                        html.P('Exclude:', style={'width': '100px', 'display': 'flex', 'verticalAlign':"middle", 'padding':'5px'}),
+                        html.P('Exclude:', style={'width': '120px', 'display': 'flex', 'verticalAlign':"middle", 'padding':'5px'}),
                         html.Div([
                             dcc.Dropdown(
-                                id='exclude',
+                                id='exclude_dropdown',
                                 #options=[{'label': j, 'value': j} for j in df_counts_combined.columns],
                                 multi=True,
                                 placeholder='Select Samples to exclude',
@@ -187,7 +189,7 @@ layout_page1 = html.Div(style={'backgroundColor': '#f5f5f5','padding': '25px'},
                     html.Div(id='selected_data', style={'display': 'none'}),
                     html.Div(id='intermediate-table', style={'display': 'none'}),
 
-                ], className='row', style={'width': '40%','display': 'inline-block', 'margin':'10px'}),
+                ], className='row', style={'width': '40%','display': 'inline-block', 'margin-bottom': '10px'}),
 
                 html.Div([
                     html.H3('Transformation & Normalization', style={'textAlign': 'left', 'padding': '10px', 'margin-top': '10px'}),
@@ -195,7 +197,7 @@ layout_page1 = html.Div(style={'backgroundColor': '#f5f5f5','padding': '25px'},
                     html.Div([
                            html.Div([
                                html.P('Select transf/norm:',
-                                      style={'width': '30%', 'display': 'flex', 'verticalAlign': "middle",
+                                      style={'width': '300px', 'display': 'flex', 'verticalAlign': "middle",
                                              'padding': '2px'}),
                                html.Div([
                                    dcc.Dropdown(
@@ -208,7 +210,7 @@ layout_page1 = html.Div(style={'backgroundColor': '#f5f5f5','padding': '25px'},
                             #], style={'display': 'flex', 'verticalAlign': "middle", 'width': '80%'}),
 
                         html.Div([
-                            html.P('Remove Confounding:', style={'width': '30%', 'display': 'flex', 'verticalAlign':"middle", 'padding':'2px'}),
+                            html.P('Remove Confounding:', style={'width': '300px', 'display': 'flex', 'verticalAlign':"middle", 'padding':'2px'}),
                             html.Div([
                                 dcc.Dropdown(
                                     id='rm_confounding',
@@ -223,30 +225,30 @@ layout_page1 = html.Div(style={'backgroundColor': '#f5f5f5','padding': '25px'},
                         #)
 
                         html.Div([
-                            daq.BooleanSwitch('force_run', on=False, color='#9B51E0', label='Force re-run', labelPosition='left'),
-                            #dcc.Checklist(
-                            #    id='force_run',
-                            #    options=[{'label': ' Force re-run', 'value': 'force_run'}],
-                            #    labelClassName='force_run'
-                            #)
+                            daq.BooleanSwitch('force_run', on=False, color='#9B51E0', label=' Force re-run', labelPosition='left'),
+
                         ], style={'display':'inline-block', 'margin-top': '5px', 'margin-bottom': '5px'}),
                         html.Br(),
 
-                        #dbc.Button("Submit", id='btn-selected_data_submit', color="primary", className="me-1",
-                        #           style={'display': 'block', 'margin': 'auto', 'width':'30%'}),
                         html.Div(
                             [
                                 html.Div([
-                                    dbc.Button('Submit', id='btn-selected_data_submit', n_clicks=0),
-                                ], style={'width': '40%', 'display': 'flex', 'flex-direction': 'column', 'margin-top': '10px'}),
-                                dbc.Spinner(html.Div(id="submit-done"), size='md', delay_hide=1, delay_show=1,
-                                            show_initially=False),
-                            ], style={'width': '60%', 'display':     'flex', 'flex-direction': 'column'}
+                                    dbc.Button('Submit', id='btn-selected_data_submit', n_clicks=0, size='md'),
+                                ], style={'width':'30%' ,'display': 'flex', 'align-items': 'center', 'margin-top': '10px',
+                                          'margin-right': '5px'}),
+
+                                html.Div([
+                                    dbc.Spinner(html.Div(id="submit-done"), size='md', delay_hide=1, delay_show=1,
+                                                show_initially=False, color="primary"),
+                                ], style={'display': 'flex', 'align-items': 'center', 'margin-left': '25px'}),
+
+                            ],
+                            style={'width': '80%', 'display': 'flex', 'flex-direction': 'row'}
                         ),
                     ]),
                 ], className='row', style={'width': '50%', 'display': 'inline-block'})
 
-            ], className='row', style={'backgroundColor':'white','display': 'flex', 'margin': 'auto', 'border': '1px solid #C6CCD5', 'padding': '20px', 'border-radius': '5px','justify-content': 'space-between', 'margin-top': 5, 'padding': 5}),
+            ], className='row', style={'top':'-25px', 'margin-left':'5px', 'margin-right':'5px', 'backgroundColor':'white','display': 'flex', 'border': '1px solid #C6CCD5', 'border-radius': '5px','justify-content': 'space-between'}),
 
             html.Div([
                 dmc.Alert(
@@ -267,18 +269,29 @@ layout_page1 = html.Div(style={'backgroundColor': '#f5f5f5','padding': '25px'},
                     withCloseButton=True
                     #n_clicks=0,
                 ),
-            ], style={'display':'none'}),#style={'textAlign': 'left', 'width':'30%', 'margin-top': 5}, id='alert_main_toggle'),
-        ], className='row', style={'display': 'flex', 'justify-content': 'space-between', 'margin-top': 5, 'padding': 5}),
+            ], style={'display':'none'}),
+        ], className='row', style={'z-index': '2', 'position': 'relative', 'display': 'flex', 'justify-content': 'space-between', 'margin-top': 5, 'margin-left': 5, 'margin-right': 5}),
 
-        html.Br(),
+        html.Div(id='select_to_explore_block',
+                 style={
+                     'width': '15px',  # width of the block
+                     'height': '40px',  # height of the block
+                     'backgroundColor': '#f5f5f5',
+                     'z-index': '1',
+                     'left': '20%',
+                     #'top': '-10px',
+                     'position': 'relative',
+                 }
+        ),
+
         html.Div([
             html.Div([
                 html.Div([
-                    html.H3('Explore genes', style={'textAlign': 'left', 'padding': '5px', 'margin-top': 5}),
+                    html.H3('Explore genes', style={'textAlign': 'left', 'margin-top': 5}),
 
                     html.Div(id='Select_gene_input'),
                     html.Div([
-                        html.Div([html.P('Ensembl:')], style={'width': '5%', 'display': 'inline-block'}),
+                        html.Div([html.P('Ensembl:')], style={'width': '80px', 'display': 'inline-block'}),
                         html.Div([dcc.Dropdown(id='gene_list',#'input-2',
                                      #options=[{'label': j, 'value': j} for j in df_counts_combined.index]
                                      multi=True,
@@ -287,7 +300,7 @@ layout_page1 = html.Div(style={'backgroundColor': '#f5f5f5','padding': '25px'},
                     ], style={'backgroundColor':'white', 'margin-top': '10px'}),
 
                     html.Div([
-                        html.Div([html.P('hgnc:')], style={'width': '5%', 'display': 'inline-block'}),
+                        html.Div([html.P('hgnc:')], style={'width': '80px', 'display': 'inline-block'}),
                         html.Div([dcc.Dropdown(id='input-2_hgnc', options=[{'label': j, 'value': j} for j in hgnc_dropdown],
                                      multi=True, value=start_genes)],style={'backgroundColor':'white','width': '70%', 'display': 'inline-block', 'verticalAlign':"middle"})
                     ]),
@@ -323,10 +336,10 @@ layout_page1 = html.Div(style={'backgroundColor': '#f5f5f5','padding': '25px'},
                     ),
 
                 ], style={'margin-top': 10, 'border':
-                    '1px solid #C6CCD5', 'padding': 5,
+                    '1px solid #C6CCD5', 'padding': 15,
                           'border-radius': '5px', 'display':'inline-block', 'width': '30%', 'verticalAlign':"middle"}
                 ),
-            ], className='row', style={'width': '100%','display': 'inline-block', 'verticalAlign':"middle", }),
+            ], className='row', style={'width': '100%','display': 'inline-block', 'verticalAlign':"middle", 'margin-bottom': '10px'}),
 
             html.Div(id='log2_table', style={'display': 'none'}),
 
@@ -350,11 +363,23 @@ layout_page1 = html.Div(style={'backgroundColor': '#f5f5f5','padding': '25px'},
             #                         {"name": i, "id": i} for i in sorted(df_symbol.columns)
             #                     ]),
 
-        ],  className='row', style={'backgroundColor':'white', 'display': 'flex', 'margin': 'auto', 'border': '1px solid #C6CCD5', 'padding': '20px', 'border-radius': '5px','justify-content': 'space-between', 'margin-top': 5, 'padding': 5}),
+        ],  className='row', style={'z-index': '2','position':'relative', 'backgroundColor':'white', 'display': 'flex', 'margin-left': '5px', 'margin-right':'5px', 'border': '1px solid #C6CCD5', 'padding': '20px', 'border-radius': '5px','justify-content': 'space-between'}),
 
-        html.Br(),
+        html.Div(id='sample_to_pca_block',
+            style={
+                'width': '15px',  # width of the block
+                'height': '40px',  # height of the block
+                'backgroundColor':  '#f5f5f5',
+                'z-index': '1',
+                'left': '20%',
+                #'top': '-1px',
+                'position': 'relative',
+
+            }
+        ),
+
         html.Div([
-            html.Div([html.H2('PCA analysis')], style={"textAlign": "left", 'margin-top': 5, 'padding': 5}),
+            html.Div([html.H2('PCA analysis')], style={"textAlign": "left", 'margin-top': 10, 'margin-left': 10}),
 
 
             #dbc.Input(id='input-gene', type='text', placeholder='Insert Gene (Ensembl)'),
@@ -430,9 +455,21 @@ layout_page1 = html.Div(style={'backgroundColor': '#f5f5f5','padding': '25px'},
                 html.Div([dcc.Graph(id='pca_correlation')]),
             ]),
 
-        ], className='row', style={'backgroundColor':'white','display': 'flex', 'margin': 'auto', 'border': '1px solid #C6CCD5', 'padding': '20px', 'border-radius': '5px','justify-content': 'space-between', 'margin-top': 5, 'padding': 5}),
+        ], className='row', style={'z-index': '2','position':'relative', 'backgroundColor':'white', 'display': 'flex', 'margin-left':'5px', 'border': '1px solid #C6CCD5', 'border-radius': '5px', 'margin-right':'5px'}),
 
-        html.Br(),
+        html.Div(id='pca_to_de_block',
+                 style={
+                     'width': '15px',  # width of the block
+                     'height': '40px',  # height of the block
+                     'backgroundColor': '#f5f5f5',
+                     'z-index': '1',
+                     'left': '20%',
+                     # 'top': '-1px',
+                     'position': 'relative',
+
+                 }
+        ),
+
         html.Div([
             html.Div([
                 html.H3('DE analysis'),
@@ -508,18 +545,21 @@ layout_page1 = html.Div(style={'backgroundColor': '#f5f5f5','padding': '25px'},
                 ]),
 
                 html.Div(
-                [
-                    #html.Div([
-                    dbc.Button('Run analysis', id='btn-DE', n_clicks=None, style={'margin-right': '5px'}),
-                    #], style={'width': '40%', 'padding': '5px'}),
+                    [
+                        #html.Div([
+                        dbc.Button('Run analysis', id='btn-DE', n_clicks=None, style={'margin-right': '5px'}),
+                        #], style={'width': '40%', 'padding': '5px'}),
 
-                    dbc.Button('Export table', id='btn_export', style={'margin-right': '5px'}),
-                    dbc.Button('Export plot', id='btn_export_plot', style={'margin-right': '5px'}),
-                    dbc.Spinner(html.Div(id="submit-de-done"), size='md', delay_hide=1, delay_show=1,
-                                show_initially=False),
-                ], style={'width': '100%', 'padding':'5px'}
+                        dbc.Button('Export table', id='btn_export', style={'margin-right': '5px'}),
+                        dbc.Button('Export plot', id='btn_export_plot', style={'margin-right': '5px'}),
+                        html.Div(
+                            dbc.Spinner(html.Div(id="submit-de-done"), size='md', delay_hide=1, delay_show=1,
+                                        show_initially=False, color="primary"),
+                            style={'align-self': 'center', 'margin-left': '25px'}
+                        ),
+                    ], style={'width': '100%', 'padding': '5px', 'display': 'flex', 'flex-direction': 'row', 'align-items': 'center'}
                 ),
-                #html.Div([
+
 
                 #], style={'width': '100%', 'padding':'5px'})
             ], style={'margin-top': 10, 'padding': 5, 'backgroundColor':'white',}),
@@ -621,14 +661,35 @@ layout_page1 = html.Div(style={'backgroundColor': '#f5f5f5','padding': '25px'},
             html.Div(id='de_table_comparison', style={'display': 'none'}),
             html.Br(),
 
-        ], className='row', style={'backgroundColor':'white', 'display': 'flex', 'margin': 'auto', 'border': '1px solid #C6CCD5', 'padding': '20px', 'border-radius': '5px','justify-content': 'space-between', 'margin-top': 5, 'padding': 5}),
+        ], className='row', style={'backgroundColor':'white', 'display': 'flex', 'margin-left': '5px', 'margin-right':'5px', 'border': '1px solid #C6CCD5', 'padding': '20px', 'border-radius': '5px','justify-content': 'space-between'}),
         html.Br(),
+
+        html.Div(id='de_to_enrichr_block',
+                 style={
+                     'width': '15px',  # width of the block
+                     'height': '40px',  # height of the block
+                     'backgroundColor': '#f5f5f5',
+                     'z-index': '1',
+                     'left': '20%',
+                     # 'top': '-1px',
+                     'position': 'relative',
+
+                 }
+        ),
 
         html.Div([
 
-            html.Div([
-                dbc.Button('Enrichr', id='btn-enrichr', n_clicks=None),
-            ]),
+            html.Div(
+                [
+                    html.Div([
+                        dbc.Button('Enrichr', id='btn-enrichr', n_clicks=None),
+                    ], style={'width': '20%', 'display': 'flex', 'flex-direction': 'row', 'margin-top': '10px'}),
+                    html.Div([
+                        dbc.Spinner(html.Div(id="submit_done_enrichr"), size='md', delay_hide=1, delay_show=1,
+                                    show_initially=False, color="primary"),
+                    ], style={'margin-left': '25px', 'display': 'flex', 'align-items': 'center'}),
+                ], style={'width': '40%', 'display': 'flex', 'flex-direction': 'row', 'align-items': 'center'}
+            ),
 
             html.Div([
                 dbc.Tabs(
@@ -647,7 +708,7 @@ layout_page1 = html.Div(style={'backgroundColor': '#f5f5f5','padding': '25px'},
                 ),
 
                 html.Div(id="enrichr_content"),
-            ], style={'margin-top': 5, 'padding': 5}),
+            ], style={'margin-top': 5, 'padding': 5, 'display': 'inline-block'}),
 
 
             html.Div(id='Enrichr_GO_bp_up_ph', style={'display': 'none'}),
@@ -659,7 +720,7 @@ layout_page1 = html.Div(style={'backgroundColor': '#f5f5f5','padding': '25px'},
             html.Div(id='Enrichr_kegg_up_ph', style={'display': 'none'}),
             html.Div(id='Enrichr_kegg_dn_ph', style={'display': 'none'}),
 
-        ], style={'backgroundColor':'white', 'display': 'flex', 'margin': 'auto', 'border': '1px solid #C6CCD5', 'padding': '20px', 'border-radius': '5px','justify-content': 'space-between', 'margin-top': 5, 'padding': 5}),
+        ], style={'backgroundColor':'white', 'display': 'flex', 'flexWrap': 'wrap', 'alignItems': 'flex-start', 'margin-left':'5px', 'margin-right':'5px', 'border': '1px solid #C6CCD5', 'padding': '20px', 'border-radius': '5px','justify-content': 'space-between'}),
     ]#, style={}
 
 )
