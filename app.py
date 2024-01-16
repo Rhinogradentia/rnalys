@@ -5,8 +5,8 @@ Application Name: Rnalys
 Description: This application is a Dash-based web app designed to quick and easy get analyse rna-seq data 
 Author: Christoffer Frisk
 Contact: Christofffer@gmail.com
-Created on: [Date]
-Last Modified: [Date]
+Created on: 2022.01.01
+Last Modified: []
 License: MIT license
 
 This application utilizes Flask and Dash to create a web-based interface for [describe the general use case]. 
@@ -33,7 +33,6 @@ import plotly.graph_objs as go
 import dash_bio as dashbio
 import pyfiglet
 import dash_bootstrap_components as dbc
-#import dash_mantine_components as dmc
 import base64
 import io
 import random
@@ -372,7 +371,15 @@ def update_alert_import(df_counts, df_info, var1, var2, var3):
         df_counts = pd.read_json(df_counts, orient='split')
         df_info = pd.read_json(df_info, orient='split')
         if list(df_counts.columns) != list(df_info.index):
-            return 'Columns in Count data does not match Rows in Info data', {'display': 'inline-block'}, {
+            list1 = set(df_counts.columns)
+            list2 = set(df_info.index)
+            diff1 = [item for item in list1 if item not in list2]
+            # Find elements in list2 not in list1
+            diff2 = [item for item in list2 if item not in list1]
+
+            return 'Columns in Count data does not match Rows in Info data \n' \
+                    'Items in counts columns but not in info index: {} \n' \
+                    'Items in info index but not in counts column: {}'.format(diff1, diff2), {'display': 'inline-block'}, {
                 'display': 'none'}
         else:
             return 'check', {'display': 'none'}, {'display': 'none'}
@@ -391,6 +398,16 @@ def update_checkmark(df_counts):
     else:
         return {'display': 'inline-block', 'position': 'relative', 'top': '0px', 'left': '5px'}
 
+@app.callback(
+    Output("alert-dismiss", "hide"),
+    Input("alert-button", "n_clicks"),
+    State("alert-dismiss", "hide"),
+    #prevent_initial_call=True,
+)
+def alert(n_clicks, hide):
+    if n_clicks is None:
+        PreventUpdate
+    return not hide
 
 @app.callback(Output('checkmark_info_div', 'style'),
               Input('df_info', 'data'))
@@ -457,10 +474,7 @@ def update_output(contents, filename, date):
 
     df = pd.read_csv(io.StringIO(decoded.decode('utf-8')), sep=sep, index_col=0)
 
-    info_columns = list(df.columns)
-    info_index = list(df.index)
-
-    return df.to_json(date_format='iso', orient='split'), info_columns, info_index
+    return df.to_json(date_format='iso', orient='split'), list(df.columns), list(df.index)
 
 @app.callback(Output("content", "children"), [Input("tabs", "active_tab")])
 def switch_tab(at):
@@ -937,7 +951,7 @@ background_pipe = {
     prevent_initial_call=True)
 def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_run, df_counts, df_info,
                       variable_selection1, variable_selection2, variable_selection3):
-    if n_clicks is 0:
+    if n_clicks == 0:
         raise PreventUpdate
     else:
 

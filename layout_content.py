@@ -726,21 +726,28 @@ layout_page1 = html.Div(style={'backgroundColor': '#f5f5f5','padding': '25px'},
 )
 
 layout_index = html.Div([
-    dbc.Container([
-       html.Div([
-        html.H5('Upload your counts with corresponding info file and get started!'),
-        html.Div(
-            id='help_info_div',
-            children=[
-                html.Img(src=b64_image('assets/help_info.png'), height='25', width='25', title='info here'),
-                ],
-                # style={'display': 'none'}  # Uncomment or modify this as needed
-        )
-        ], style={'padding': '25px', 'display': 'flex', 'alignItems': 'center'}),
-        html.Div([
+        dbc.Container([
+        
+       
+           
+
             html.Div([
-                html.Div(
-                         children=[
+                html.Div([
+                    html.H5('Upload your counts with corresponding info file and get started!', style={'flex-grow': 1, 'margin-left': '10px'}),
+                    html.Div([
+                        html.I(className="fas fa-question-circle fa-lg", id="target", style={'padding': '10px'}),
+                        dbc.Tooltip("Inserted count data should have columns matching index rows in meta data, the first column in the meta table should represent the sample", 
+                                    target="target",
+                                    style={'font-size': '15px'})
+                    ], style={'display': 'inline-block', 'vertical-align': 'middle'}),
+                ], style={'width': '70%', 'display': 'flex', 'align-items': 'center', 'justify-content': 'space-between'}),
+            ]),
+
+
+                html.Div([
+                    html.Div([
+                        html.Div(
+                            children=[
 
                             dcc.Upload(
                                 id='upload-data',
