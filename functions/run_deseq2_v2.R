@@ -16,8 +16,19 @@ outfile = args[6]
 #print(paste('design:', design, sep=' '))
 #print(design)
 
+#extract_first_variable <- function(input_string) {
+#  match <- regmatches(input_string, regexpr("(?<=~)\\w+(?=\\+)", input_string, perl = TRUE))
+#
+#  if (match == "") {
+#    return(NULL)
+#  } else {
+#    return(match)
+#  }
+#}
+
+
 extract_first_variable <- function(input_string) {
-  match <- regmatches(input_string, regexpr("(?<=~)\\w+(?=\\+)", input_string, perl = TRUE))
+  match <- regmatches(input_string, regexpr("(?<=~)\\w+", input_string, perl = TRUE))
 
   if (match == "") {
     return(NULL)
@@ -27,7 +38,6 @@ extract_first_variable <- function(input_string) {
 }
 
 
-
 run_DE <-  function (indata, insample, rowm, design, outfile, reference) {
   #The insample table requires the column "SeqTag" and tissue
   insample <- read.table(insample, sep='\t', header=T)
@@ -35,13 +45,13 @@ run_DE <-  function (indata, insample, rowm, design, outfile, reference) {
   insample$X <- NULL
  
 
-  if (grepl('bin4', design, fixed = TRUE) == TRUE){
-    insample$age_bin4 <- cut(insample$age, b=4)
-  }
+  #if (grepl('bin4', design, fixed = TRUE) == TRUE){
+  #  insample$age_bin4 <- cut(insample$age, b=4)
+  #}
   
-  if (grepl('bin5', design, fixed = TRUE) == TRUE){
-    insample$age_bin5 <- cut(insample$age, b=5)
-  }
+  #if (grepl('bin5', design, fixed = TRUE) == TRUE){
+  #  insample$age_bin5 <- cut(insample$age, b=5)
+  #}
   
   
   indata <- read.table(indata, sep='\t', header=T)

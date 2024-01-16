@@ -1,4 +1,25 @@
 # -*- coding: utf-8 -*-
+
+"""
+Application Name: Rnalys
+Description: This application is a Dash-based web app designed to quick and easy get analyse rna-seq data 
+Author: Christoffer Frisk
+Contact: Christofffer@gmail.com
+Created on: [Date]
+Last Modified: [Date]
+License: MIT license
+
+This application utilizes Flask and Dash to create a web-based interface for [describe the general use case]. 
+It incorporates features such as [mention any significant features like data visualization, user interaction, etc.].
+
+Modules and Libraries:
+- Flask: Used for setting up the server.
+- Dash: Main framework for the web application.
+- Pandas, Numpy: Data manipulation and numerical calculations.
+- Plotly: Creating interactive plots and graphs.
+- [Other Libraries]: [Their purposes].
+"""
+
 import os
 import json
 import math
@@ -12,12 +33,11 @@ import plotly.graph_objs as go
 import dash_bio as dashbio
 import pyfiglet
 import dash_bootstrap_components as dbc
-import dash_mantine_components as dmc
+#import dash_mantine_components as dmc
 import base64
 import io
 import random
 import string
-
 from typing import List, Tuple, Any
 from dash import dcc
 from dash import html
@@ -30,27 +50,38 @@ from layout_content import layout_index, layout_page1
 from dash.dependencies import Input, Output, State
 from datetime import datetime
 
+# Configuration for external stylesheets
 FONT_AWESOME = "https://use.fontawesome.com/releases/v5.10.2/css/all.css"
+
 
 app = dash.Dash(
     __name__,
-    #external_stylesheets=['https://codepen.io/chriddyp/pen/bWLwgP.css', dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP],
-    #external_stylesheets=['https://codepen.io/chriddyp/pen/bWLwgP.css'],
+    # external_stylesheets=['https://codepen.io/chriddyp/pen/bWLwgP.css', dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP],
+    # external_stylesheets=['https://codepen.io/chriddyp/pen/bWLwgP.css'],
     external_stylesheets=[dbc.themes.LITERA, FONT_AWESOME],
     suppress_callback_exceptions=True
 )
+"""
+Initializes the Dash app with specific external stylesheets.
+- dbc.themes.LITERA: Bootstrap theme for styling.
+- FONT_AWESOME: Font Awesome for icons.
+suppress_callback_exceptions is set to True for handling exceptions in callbacks.
+"""
+
+#df meta : df_meta_v3.tab
+#df counts: df_counts_combined.tab
 
 url_bar_and_content_div = html.Div([
     dcc.Location(id='url', refresh=False),
 
-    #Data shared between pages
-    dcc.Store(id='df_counts'),#, storage_type='session'),
-    dcc.Store(id='df_info'),# storage_type='session'),
+    # Data shared between pages
+    dcc.Store(id='df_counts'),  # , storage_type='session'),
+    dcc.Store(id='df_info'),  # storage_type='session'),
     dcc.Store(id='variable_selection1_store'),
     dcc.Store(id='variable_selection2_store'),
     dcc.Store(id='variable_selection3_store'),
 
-    #Spliting dataframes to speed up for referencing
+    # Spliting dataframes to speed up for referencing
     dcc.Store(id='counts_index_store'),
     dcc.Store(id='counts_columns_store'),
     dcc.Store(id='info_columns_store'),
@@ -59,9 +90,7 @@ url_bar_and_content_div = html.Div([
     html.Div(id='page-content')
 ])
 
-
-
-#Genesymbol
+# Genesymbol
 df_symbol_file = './data/ensembl_symbol.csv'
 df_symbol = pd.read_csv(df_symbol_file, sep='\t')
 df_symbol.index = df_symbol['ensembl_gene_id']
@@ -83,21 +112,21 @@ lExclude = []
 lTissue = []
 PAGE_SIZE = 10
 
-#Load Human protein atlas (consensus rna tissue)
+# Load Human protein atlas (consensus rna tissue)
 df_hpa = pd.read_csv('data/rna_tissue_consensus.tsv', sep='\t', index_col='Gene')
 
-#Setup for Enrichr
+# Setup for Enrichr
 databases_enrichr = ['TRANSFAC_and_JASPAR_PWMs', 'OMIM_Disease', 'OMIM_Expanded', 'KEGG_2016', 'BioCarta_2016',
                      'WikiPathways_2016', 'Panther_2016', 'GO_Biological_process_2018', 'GO_Cellular_Component_2018',
                      'GO_Molecular_Function_2018', 'Human_Phenotype_Ontology', 'MGI_Mammalian_Phenotype_2017',
                      'Jensen_DISEASES']
 
-#Create temporary df for volcanoplot init
+# Create temporary df for volcanoplot init
 columns = ['Ensembl', 'hgnc', 'baseMean', 'log2FoldChange', 'pvalue', 'padj']
 data = [['ens', 'hgnc1', 10, 4, 0.005, 0.9995]]
 df = pd.DataFrame(data, columns=columns)
 
-#Layouts
+# Layouts
 layout_index = layout_index
 layout_page1 = layout_page1
 
@@ -106,7 +135,21 @@ def generate_random_string(length=7):
     random_string = ''.join(random.choices(characters, k=length))
     return random_string
 
+
 def write_dataset(lSamples, lExclude, id_name=None):
+
+    """
+    Writes dataset information to a CSV file. This function is used for storing sample names,
+    excluded names, and an optional ID name.
+
+    Parameters:
+    - lSamples (list): List of sample names.
+    - lExclude (list): List of names to exclude.
+    - id_name (str, optional): An identifier name for the dataset.
+
+    The function checks if the 'data/datasets/' directory exists, creates it if not, and then writes 
+    the dataset information to 'data/datasets/datasets.csv'.
+    """
     # Generate a random filename
     dataset_file_path = 'data/datasets/datasets.csv'
     sample_names = ' '.join(lSamples)
@@ -133,18 +176,16 @@ def write_dataset(lSamples, lExclude, id_name=None):
     # Write the DataFrame to a CSV file
     df.to_csv(dataset_file_path, index=False)
 
-
 def load_dataset(dataset_name):
     dataset_file_path = 'data/datasets/datasets.csv'
 
     if os.path.isfile(dataset_file_path):
-
         df = pd.read_csv(dataset_file_path, index_col=False)
         matching_row = df[df['ID Name'] == dataset_name]
 
         # If there is a matching row, return the Sample Names
         if not matching_row.empty:
-            #print(matching_row['Sample Names'].values[0])
+            # print(matching_row['Sample Names'].values[0])
             return matching_row['Sample Names'].values[0], matching_row['Exclude Names'].values[0]
 
         # If there is no matching row, return None
@@ -157,7 +198,19 @@ def load_dataset(dataset_name):
         return None
 
 
-def write_session_to_file(sample_names, rm_confounding ,transformation, file_string, id_name=None):
+def write_session_to_file(sample_names, rm_confounding, transformation, file_string, id_name=None):
+    '''
+    Writes session information to a file. This is used for tracking various parameters of a user session.
+    
+    Parameters:
+        - sample_names (list): List of sample names.
+        - rm_confounding (bool): Flag for removing confounding variables.
+        - transformation (str): The type of transformation applied.
+        - file_string (str): A string identifier for the file.
+        - id_name (str, optional): An identifier name for the session.
+
+        This function writes the session data to 'data/datasets/session_file.txt'.
+    '''
     session_file_path = 'data/datasets/session_file.txt'
     # Write the sample names to the file
     # > sample1 sample2 sample3 transformation %id_name %file_string
@@ -166,7 +219,7 @@ def write_session_to_file(sample_names, rm_confounding ,transformation, file_str
         'Transformation': [transformation],
         'ID Name': [id_name],
         'rm_confounding': [rm_confounding],
-        'File String': [file_string]
+        'file_string': [file_string]
     })
 
     # If the file exists, read the existing data and append the new data
@@ -178,7 +231,17 @@ def write_session_to_file(sample_names, rm_confounding ,transformation, file_str
     df.to_csv(session_file_path, index=False)
 
 def search_session(sample_string, transformation, rm_confounding):
-    #matches samples, transformation, rm_confounding and returns file_string
+    """
+    Searches for a session in the session file that matches given parameters.
+
+    Parameters:
+    - sample_string (list): List of sample names.
+    - transformation (str): The type of transformation applied.
+    - rm_confounding (bool): Flag for removing confounding variables.
+
+    Returns:
+    - list or None: Returns a list of file strings if a matching session is found, otherwise None.
+    """
 
     session_file_path = 'data/datasets/session_file.txt'
     outdir = 'data/datasets/'
@@ -187,7 +250,7 @@ def search_session(sample_string, transformation, rm_confounding):
         os.makedirs(outdir)
 
     if not os.path.isfile(session_file_path):
-        df = pd.DataFrame(columns=['Sample Names', 'ID Name', 'Transformation', 'rm_confounding', 'File String'])
+        df = pd.DataFrame(columns=['Sample Names', 'ID Name', 'Transformation', 'rm_confounding', 'file_string'])
         df.to_csv(session_file_path, index=False)
 
     df = pd.read_csv(session_file_path)
@@ -196,13 +259,11 @@ def search_session(sample_string, transformation, rm_confounding):
     print(rm_confounding)
     print(' '.join(sample_string))
     print(transformation)
-
-    #if rm_confounding == None:
+    # if rm_confounding == None:
     #    rm_confounding = np.nan
 
     print(df['rm_confounding'])
     print('rm_confounding:', df['rm_confounding'] == rm_confounding)
-
 
     matching_rows = df[
         (df['Sample Names'] == ' '.join(sample_string)) &
@@ -212,7 +273,7 @@ def search_session(sample_string, transformation, rm_confounding):
 
     # If there are any matching rows, return the File String value(s)
     if not matching_rows.empty:
-        return matching_rows['File String'].tolist()
+        return matching_rows['file_string'].tolist()
 
     # If there are no matching rows, return None
     return None
@@ -223,6 +284,7 @@ def file_len(fname):
         for i, l in enumerate(f):
             pass
     return i + 1
+
 
 class db_res:
     def __init__(self, name):
@@ -235,14 +297,6 @@ class db_res:
         if updn == 'dn':
             self.updn_dict['dn'] = indict
 
-'''
-def save_dataset_to_file(lFilename_list):
-
-    dataset_file = open('data/datasets.txt', 'a')
-    dataset_file.write(lFilename_list[0]+' '+lFilename_list[1]+ "\n")
-    dataset_file.close()
-'''
-
 def serve_layout():
     if flask.has_request_context():
         return url_bar_and_content_div
@@ -252,9 +306,23 @@ def serve_layout():
         layout_page1,
     ])
 
+
 app.layout = serve_layout
 
+
 def parse_contents(contents, filename, date):
+    """
+    Parses contents uploaded by the user and returns a Dash HTML Div displaying the content.
+    Handles different file types (CSV, Excel).
+
+    Parameters:
+    - contents (str): The contents of the uploaded file.
+    - filename (str): The name of the uploaded file.
+    - date (int): The upload timestamp.
+
+    Returns:
+    - dash.development.base_component.Component: A Div containing the parsed file data.
+    """
     content_type, content_string = contents.split(',')
     decoded = base64.b64decode(content_string)
     try:
@@ -290,23 +358,22 @@ def parse_contents(contents, filename, date):
         })
     ])
 
-
 @app.callback(
-            Output('alert_import_info', 'value'),
-            Output('alert_import_info_div', 'style'),
-            Output('page_proceed', 'style'),
-            Input('df_counts', 'data'),
-            Input('df_info', 'data'),
-            Input('variable_selection1','value'),
-            Input('variable_selection2','value'),
-            Input('variable_selection3','value'))
+    Output('alert_import_info', 'value'),
+    Output('alert_import_info_div', 'style'),
+    Output('page_proceed', 'style'),
+    Input('df_counts', 'data'),
+    Input('df_info', 'data'),
+    Input('variable_selection1', 'value'),
+    Input('variable_selection2', 'value'),
+    Input('variable_selection3', 'value'))
 def update_alert_import(df_counts, df_info, var1, var2, var3):
-
     if df_counts is not None and df_info is not None and var1 is None and var2 is None and var3 is None:
         df_counts = pd.read_json(df_counts, orient='split')
         df_info = pd.read_json(df_info, orient='split')
         if list(df_counts.columns) != list(df_info.index):
-            return 'Columns in Count data does not match Rows in Info data', {'display': 'inline-block'}, {'display': 'none'}
+            return 'Columns in Count data does not match Rows in Info data', {'display': 'inline-block'}, {
+                'display': 'none'}
         else:
             return 'check', {'display': 'none'}, {'display': 'none'}
 
@@ -315,13 +382,14 @@ def update_alert_import(df_counts, df_info, var1, var2, var3):
     else:
         raise PreventUpdate
 
+
 @app.callback(Output('checkmark_counts_div', 'style'),
               Input('df_counts', 'data'))
 def update_checkmark(df_counts):
     if df_counts is None:
         raise PreventUpdate
     else:
-        return {'display':'inline-block', 'position':'relative', 'top':'13px', 'left':'-100px'}
+        return {'display': 'inline-block', 'position': 'relative', 'top': '0px', 'left': '5px'}
 
 
 @app.callback(Output('checkmark_info_div', 'style'),
@@ -330,7 +398,7 @@ def update_checkmark(df_counts):
     if df_counts is None:
         raise PreventUpdate
     else:
-        return {'display':'flex', 'position':'relative', 'top':'13px', 'left':'-100px'}
+        return {'display': 'flex', 'position': 'relative', 'top': '10px', 'left': '10px'}
 
 
 @app.callback(Output('df_counts', 'data'),
@@ -340,7 +408,7 @@ def update_checkmark(df_counts):
               Output('counts_columns_store', 'data'),
               Input('upload-data', 'contents'),
               State('upload-data', 'filename'),
-              State('upload-data', 'last_modified'))
+              State('upload-data', 'last_modified'),)
 def update_output(contents, filename, date):
     if contents is None:
         raise PreventUpdate
@@ -349,7 +417,7 @@ def update_output(contents, filename, date):
     decoded = base64.b64decode(content_string)
 
     if filename.endswith('csv'):
-        sep=','
+        sep = ','
     elif filename.endswith('tab'):
         sep = '\t'
     elif filename.endswith('tsv'):
@@ -379,7 +447,7 @@ def update_output(contents, filename, date):
     decoded = base64.b64decode(content_string)
 
     if 'csv' in filename:
-        sep=','
+        sep = ','
     elif 'tab' in filename:
         sep = '\t'
     elif 'tsv' in filename:
@@ -393,8 +461,6 @@ def update_output(contents, filename, date):
     info_index = list(df.index)
 
     return df.to_json(date_format='iso', orient='split'), info_columns, info_index
-
-
 
 @app.callback(Output("content", "children"), [Input("tabs", "active_tab")])
 def switch_tab(at):
@@ -425,7 +491,6 @@ def switch_tab(at):
     return html.P("This shouldn't ever be displayed...")
 
 
-
 @app.callback(
     Output('dataset_name_placeholder', 'children'),
     Input('btn_save_dataset', 'n_clicks_timestamp'),
@@ -441,10 +506,11 @@ def save_dataset(n_clicks, selected_data, dataset_name, lExclude):
     datasets = json.loads(selected_data)
     lSamples = json.loads(datasets['samples'])
     dataset_name = dataset_name
-    #print([dataset_name, ' '.join(lSamples)])
-    #save_dataset_to_file([dataset_name, ' '.join(lSamples)])
-    #write_sample_names_to_file(lSamples, 'test')
+    # print([dataset_name, ' '.join(lSamples)])
+    # save_dataset_to_file([dataset_name, ' '.join(lSamples)])
+    # write_sample_names_to_file(lSamples, 'test')
     write_dataset(lSamples, lExclude, id_name=dataset_name)
+
 
 @app.callback(Output('page-content', 'children'),
               [Input('url', 'pathname')])
@@ -465,19 +531,20 @@ def table_type(df_column):
     if isinstance(df_column.dtype, pd.DatetimeTZDtype):
         return 'datetime',
     elif (isinstance(df_column.dtype, pd.StringDtype) or
-            isinstance(df_column.dtype, pd.BooleanDtype) or
-            isinstance(df_column.dtype, pd.CategoricalDtype) or
-            isinstance(df_column.dtype, pd.PeriodDtype)):
+          isinstance(df_column.dtype, pd.BooleanDtype) or
+          isinstance(df_column.dtype, pd.CategoricalDtype) or
+          isinstance(df_column.dtype, pd.PeriodDtype)):
         return 'text'
     elif (isinstance(df_column.dtype, pd.SparseDtype) or
-            isinstance(df_column.dtype, pd.IntervalDtype) or
-            isinstance(df_column.dtype, pd.Int8Dtype) or
-            isinstance(df_column.dtype, pd.Int16Dtype) or
-            isinstance(df_column.dtype, pd.Int32Dtype) or
-            isinstance(df_column.dtype, pd.Int64Dtype)):
+          isinstance(df_column.dtype, pd.IntervalDtype) or
+          isinstance(df_column.dtype, pd.Int8Dtype) or
+          isinstance(df_column.dtype, pd.Int16Dtype) or
+          isinstance(df_column.dtype, pd.Int32Dtype) or
+          isinstance(df_column.dtype, pd.Int64Dtype)):
         return 'numeric'
     else:
         return 'any'
+
 
 @app.callback([Output('exclude_list', 'children')],
               [Input('exclude_dropdown', 'value')])
@@ -489,15 +556,16 @@ def exclude_helper(exclude, verbose=0):
 
 
 @app.callback(Output('variable_selection1', 'options'),
-             Input('df_info', 'data'))
+              Input('df_info', 'data'))
 def select_var1(df_info):
     if df_info is not None:
         df_info = pd.read_json(df_info, orient='split')
         ret = [{'label': j, 'value': j} for j in df_info.columns.to_list()]
         return ret
 
+
 @app.callback(Output('variable_selection1_store', 'data'),
-             Input('variable_selection1', 'value'))
+              Input('variable_selection1', 'value'))
 def select_var1_page1(variable1_value):
     if variable1_value is None:
         raise PreventUpdate
@@ -507,8 +575,8 @@ def select_var1_page1(variable1_value):
 
 
 @app.callback(Output('variable1_selected_dropdown', 'options'),
-             Input('df_info', 'data'),
-             Input('variable_selection1_store', 'data'))
+              Input('df_info', 'data'),
+              Input('variable_selection1_store', 'data'))
 def select_var1(df_info, variable1_value):
     if variable1_value is None:
         raise PreventUpdate
@@ -518,17 +586,18 @@ def select_var1(df_info, variable1_value):
         filtered_data = [item for item in ret if item["label"] is not None and item["value"] is not None]
         return filtered_data
 
-@app.callback(Output('variable_selection2', 'options'),
-             Input('df_info', 'data'))
-def select_var2(df_info):
 
+@app.callback(Output('variable_selection2', 'options'),
+              Input('df_info', 'data'))
+def select_var2(df_info):
     if df_info is not None:
         df_info = pd.read_json(df_info, orient='split')
         ret = [{'label': j, 'value': j} for j in df_info.columns.to_list()]
         return ret
 
+
 @app.callback(Output('variable_selection2_store', 'data'),
-             Input('variable_selection2', 'value'))
+              Input('variable_selection2', 'value'))
 def select_var2_page2(variable2_value):
     if variable2_value is None:
         raise PreventUpdate
@@ -538,8 +607,8 @@ def select_var2_page2(variable2_value):
 
 
 @app.callback(Output('variable2_selected_dropdown', 'options'),
-             Input('df_info', 'data'),
-             Input('variable_selection2_store', 'data'))
+              Input('df_info', 'data'),
+              Input('variable_selection2_store', 'data'))
 def select_var2(df_info, variable2_value):
     if variable2_value is None:
         raise PreventUpdate
@@ -551,16 +620,17 @@ def select_var2(df_info, variable2_value):
 
 
 @app.callback(Output('variable_selection3', 'options'),
-             Input('df_info', 'data'))
+              Input('df_info', 'data'))
 def select_var3(df_info):
     if df_info is not None:
         df_info = pd.read_json(df_info, orient='split')
         ret = [{'label': j, 'value': j} for j in df_info.columns.to_list()]
         return ret
 
+
 @app.callback(Output('variable3_selected_dropdown', 'options'),
-             Input('df_info', 'data'),
-             Input('variable_selection3_store', 'data'))
+              Input('df_info', 'data'),
+              Input('variable_selection3_store', 'data'))
 def select_var1(df_info, variable3_value):
     if variable3_value is None:
         raise PreventUpdate
@@ -572,7 +642,7 @@ def select_var1(df_info, variable3_value):
 
 
 @app.callback(Output('variable_selection3_store', 'data'),
-             Input('variable_selection3', 'value'))
+              Input('variable_selection3', 'value'))
 def select_var3_page1(variable3_value):
     if variable3_value is None:
         raise PreventUpdate
@@ -580,21 +650,23 @@ def select_var3_page1(variable3_value):
         print('variable3_value', variable3_value)
         return variable3_value
 
+
 @app.callback(Output('varaible_selection_div', 'style'),
-             Input('df_info', 'data'))
+              Input('df_info', 'data'))
 def select_var_div(df_info):
     if df_info is None:
         raise PreventUpdate
     else:
-        return {'display':'inline-block'}
+        return {'display': 'inline-block'}
+
 
 @app.callback(Output('exclude_dropdown', 'options'),
               Output('rm_confounding', 'options'),
               Output('meta_dropdown', 'options'),
               Output('gene_list', 'options'),
               Output('meta_dropdown_groupby', 'options'),
-              #Input('df_counts', 'data'),
-              #Input('df_info', 'data'))
+              # Input('df_counts', 'data'),
+              # Input('df_info', 'data'))
               Input('counts_columns_store', 'data'),
               Input('counts_index_store', 'data'),
               Input('info_columns_store', 'data'))
@@ -610,63 +682,18 @@ def exclude_dropdown(counts_columns, counts_index, info_columns):
         raise PreventUpdate
 
 
-'''
-@app.callback([Output('exclude', 'value'),
-              Output('variable3_selected_dropdown', 'value'),
-               Output('variable1_selected_dropdown', 'value'),
-               Output('variable2_selected_dropdown', 'value')],
-              [Input('datasets', 'value')],
-              [State('exclude_list', 'children'),
-               State('df_info', 'data'),
-               State('variable_selection1_store', 'data'),
-               State('variable_selection2_store', 'data'),
-               State('variable_selection3_store', 'data')])
-def select_helper(dataset, data, df_info, variable1, variable2, variable3):
-
-    if df_info is not None:
-        df_info = pd.read_json(df_info, orient='split')
-
-        if dataset == 'New':
-            lSamples = []
-            lVar1 = []
-            lVar2 = []
-            lVar3 = []
-
-        else:
-            lSamples = load_dataset(dataset)
-            df_info_temp = df_info[df_info['full_name'].isin(lSamples)]
-            
-            lVar1 = list(df_info_temp[variable1].unique())
-            lVar2 = list(df_info_temp[variable2].unique())
-            lVar3 = list(df_info_temp[variable3].unique())
-
-        if data:
-            exclude_list = json.loads(data)
-
-        df_info_temp = df_info[df_info[variable3].isin(lVar3)]
-        df_info_temp = df_info_temp[df_info_temp[variable1].isin(lVar1)]
-        df_info_temp = df_info_temp[df_info_temp[variable2].isin(lVar2)]
-        #lExclude = #list(df_info_temp[~df_info_temp['id_tissue'].isin(lSamples)].index)
-        lExclude = []
-
-        return lExclude, lVar3, lVar1, lVar2
-    else:
-        raise PreventUpdate
-'''
-
 @app.callback(Output('exclude_dropdown', 'value'),
               Output('variable1_selected_dropdown', 'value'),
-               Output('variable2_selected_dropdown', 'value'),
-               Output('variable3_selected_dropdown', 'value'),
+              Output('variable2_selected_dropdown', 'value'),
+              Output('variable3_selected_dropdown', 'value'),
               Input('datasets', 'value'),
-              #State('exclude_list', 'children'),
+              # State('exclude_list', 'children'),
               State('df_info', 'data'),
               State('variable_selection1_store', 'data'),
               State('variable_selection2_store', 'data'),
               State('variable_selection3_store', 'data'),
               PreventUpdate=True)
 def select_helper(dataset, df_info, variable1, variable2, variable3):
-
     if dataset != 'New':
         df_info = pd.read_json(df_info, orient='split')
         lSamples, lExclude = load_dataset(dataset)
@@ -686,8 +713,8 @@ def select_helper(dataset, df_info, variable1, variable2, variable3):
 @app.callback(
     Output('export_plot_clicked', 'children'),
     Input('btn_export_plot', 'n_clicks_timestamp'),
-        State('intermediate-DEtable', 'children'),
-        State('intermediate-table', 'children'))
+    State('intermediate-DEtable', 'children'),
+    State('intermediate-table', 'children'))
 def export_plot(n_clicks, indata, prefixes):
     if n_clicks is None:
         raise PreventUpdate
@@ -696,24 +723,24 @@ def export_plot(n_clicks, indata, prefixes):
 
             datasets = json.loads(indata)
             df_degenes = pd.read_json(datasets['de_table'], orient='split')
-            #dTranslate = dict(df_symbol.loc[df_degenes.index]['hgnc_symbol'])
-            #print(df_degenes.index)
+            # dTranslate = dict(df_symbol.loc[df_degenes.index]['hgnc_symbol'])
+            # print(df_degenes.index)
             df_degenes['hgnc'] = [dTranslate.get(x, x) for x in df_degenes.index]
 
-            file_string = json.loads('file_string')
-            #prefixes = json.loads(prefixes)
-            #lTotal = json.loads(prefixes['prefixes'])
-            #sTotal = '_'.join(lTotal)
-            #sTotal = sTotal + '_for_DEplot.tab'
+            # file_string = json.loads('file_string')
+            file_string = datasets['file_string']
+            # prefixes = json.loads(prefixes)
+            # lTotal = json.loads(prefixes['prefixes'])
+            # sTotal = '_'.join(lTotal)
+            # sTotal = sTotal + '_for_DEplot.tab'
 
-            outdir = 'data/generated/'
+            outdir = './data/generated/'
             de_file_for_plot = file_string + '_for_DEplot.tab'
-
 
             de_file_for_plot_path = outdir + de_file_for_plot
 
-            df_degenes.to_csv('data/generated/%s' %de_file_for_plot_path, sep='\t')
-            volcano_file = outdir+ file_string + '_volcano.R'
+            df_degenes.to_csv(de_file_for_plot_path, sep='\t')
+            volcano_file = file_string + '_volcano.R'
 
             # Read in the file
             with open('./data/templates/volcano_template.R', 'r') as file:
@@ -723,52 +750,53 @@ def export_plot(n_clicks, indata, prefixes):
             filedata = filedata.replace('infile_holder', de_file_for_plot_path)
 
             # Write the file out again
-            with open('./data/scripts/%s' %volcano_file, 'w') as file:
+            with open('./data/scripts/%s' % volcano_file, 'w') as file:
                 file.write(filedata)
-            return ['Created plot file %s' %volcano_file]
+            return ['Created plot file %s' % volcano_file]
 
         else:
             print('Run DE analysis first')
             return ['Can not create plot (run the analysis)']
 
 
-#Function to only update select data table
+# Function to only update select data table
 @app.callback(
     [Output('selected_data', 'children'),
-    Output('alert_selection', 'hide')],
+     Output('alert_selection', 'hide')],
     [Input('exclude_dropdown', 'value'),
-    Input('transformation', 'value'),
-    Input('variable1_selected_dropdown', 'value'),
-    Input('variable2_selected_dropdown', 'value'),
-    Input('variable3_selected_dropdown', 'value'),
-    Input('variable_selection1_store', 'data'),
-    Input('variable_selection2_store', 'data'),
-    Input('variable_selection3_store', 'data')],
+     Input('transformation', 'value'),
+     Input('variable1_selected_dropdown', 'value'),
+     Input('variable2_selected_dropdown', 'value'),
+     Input('variable3_selected_dropdown', 'value'),
+     Input('variable_selection1_store', 'data'),
+     Input('variable_selection2_store', 'data'),
+     Input('variable_selection3_store', 'data')],
     [State('df_info', 'data')],
     prevent_initial_call=True)
-def select_info(lExclude, transformation, variable1_dropdown, variable2_dropdown, variable3_dropdown, variable1, variable2, variable3, df_info):
-    #variable_selection1_store = column_name_variable1 = tissue
-    #variable1 = LV RV etc
-    if variable1_dropdown is not None and variable2_dropdown is not None and variable3_dropdown is not None and df_info is not None:
+def select_info(lExclude, transformation, variable1_dropdown, variable2_dropdown, variable3_dropdown, variable1,
+                variable2, variable3, df_info):
+    # variable_selection1_store = column_name_variable1 = tissue
+    # variable1 = LV RV etc
 
+    if all(var is not None for var in [variable1_dropdown, variable2_dropdown, variable3_dropdown, df_info]):
         df_info = pd.read_json(df_info, orient='split')
 
         transformation = 'None' if transformation == 'Sizefactor normalization' else transformation
 
-        df_info_temp = df_info.loc[df_info[variable1].isin(variable1_dropdown),]
-        df_info_temp = df_info_temp.loc[df_info_temp[variable2].isin(variable2_dropdown),]
-        df_info_temp = df_info_temp.loc[df_info_temp[variable3].isin(variable3_dropdown),]
+        df_info_temp = df_info.loc[df_info[variable1].isin(variable1_dropdown), ]
+        df_info_temp = df_info_temp.loc[df_info_temp[variable2].isin(variable2_dropdown), ]
+        df_info_temp = df_info_temp.loc[df_info_temp[variable3].isin(variable3_dropdown), ]
 
-        #lExclude = lExclude.split()
-        #print(lExclude)
+        # lExclude = lExclude.split()
+        # print(lExclude)
 
         if len(lExclude) > 0:
-            #df_info_temp = df_info_temp.loc[~df_info_temp['id_tissue'].isin(lExclude), ]
+            # df_info_temp = df_info_temp.loc[~df_info_temp['id_tissue'].isin(lExclude), ]
             print(lExclude)
             df_info_temp = df_info_temp[~df_info_temp.index.isin(lExclude)]
 
-        #df_info_temp.index = df_info_temp[[variable1, variable1]].apply(lambda x: '_'.join(x), axis=1)
-        #df_info_temp['full_name'] = [x+'_'+df_info_temp.loc[x, variable1] for x in df_info_temp.index]
+        # df_info_temp.index = df_info_temp[[variable1, variable1]].apply(lambda x: '_'.join(x), axis=1)
+        # df_info_temp['full_name'] = [x+'_'+df_info_temp.loc[x, variable1] for x in df_info_temp.index]
 
         datasets = {variable1: json.dumps(df_info_temp[variable1].unique().tolist()),
                     'transformation': transformation,
@@ -776,7 +804,7 @@ def select_info(lExclude, transformation, variable1_dropdown, variable2_dropdown
                     variable3: json.dumps(df_info_temp[variable3].unique().tolist()),
                     'exclude': json.dumps(lExclude),
                     'samples': json.dumps(df_info_temp.index.to_list()),
-                    #'full_name': json.dumps(df_info_temp['full_name'].to_list()),
+                    # 'full_name': json.dumps(df_info_temp['full_name'].to_list()),
                     'empty': '0'}
 
         return json.dumps(datasets), ''
@@ -785,6 +813,7 @@ def select_info(lExclude, transformation, variable1_dropdown, variable2_dropdown
         empty = {'empty': '1'}
         return json.dumps(empty), 'testtesttest'
 
+
 def create_de_table_comp(data, output):
     return html.Div(
         [
@@ -792,7 +821,7 @@ def create_de_table_comp(data, output):
                 id=output,
                 data=data.to_dict('records'),
                 columns=[{'id': c, 'name': c} for c in data.columns],
-                #style_as_list_view=True,
+                # style_as_list_view=True,
                 selected_rows=[],
                 style_cell={'padding': '5px',
                             'whiteSpace': 'no-wrap',
@@ -813,77 +842,14 @@ def create_de_table_comp(data, output):
 
             ),
         ], className="row", style={'margin-top': '35',
-                                             'margin-left': '15',
-                                             'border': '1px solid #C6CCD5'}
+                                   'margin-left': '15',
+                                   'border': '1px solid #C6CCD5'}
     )
 
 
-'''
 @app.callback(
     [Output('de_table_comparison', 'children'),
-    Output('table-box', 'children')],
-    [Input('add_de_table', 'n_clicks_timestamp'),
-     Input('clear_de_table', 'n_clicks_timestamp')],
-    [State('DE-table', 'data'),
-     State('de_table_comparison', 'children'),
-     State('intermediate-table', 'children')]
-)
-def add_de_set(btn_add: int, btn_clear: int, indata_de: List[dict],
-               detable_comp: str, intermediate_data: str) -> Tuple[str, Any]:
-
-    if btn_add is None:
-        raise PreventUpdate
-
-    if btn_clear is not None and btn_clear > btn_add:
-        return json.dumps({'de_table_comp': pd.DataFrame({'hgnc': []}).to_json(orient='split', date_format='iso')}), None
-
-    de_table = pd.DataFrame.from_dict(indata_de) if indata_de else pd.DataFrame()
-
-    if de_table.empty:
-        print('DE table empty')
-        return json.dumps({'de_table_comp': de_table.to_json(orient='split', date_format='iso')}), None
-
-    de_table.index = de_table['Ensembl']
-
-    de_table_comp = None
-    if detable_comp:
-        try:
-            datasets2 = json.loads(detable_comp)
-            de_table_comp = pd.read_json(datasets2['de_table_comp'], orient='split')
-        except json.JSONDecodeError:
-            print('Error parsing detable_comp')
-
-    datasets3 = json.loads(intermediate_data)
-    name = '_'.join(json.loads(datasets3['prefix_sub']))
-    de_table = de_table.rename(columns={'log2FoldChange': name})
-
-    if de_table_comp is not None:
-        df = de_table[['hgnc', name]].copy()
-        df['hgnc_temp'] = df['hgnc']
-        df = df.drop(['hgnc'], axis=1)
-        df = pd.concat([de_table_comp, df], axis=1)
-        df['hgnc'].fillna(df['hgnc_temp'], inplace=True)
-        df = df.drop(['hgnc_temp'], axis=1)
-    else:
-        df = de_table[['hgnc', name]].copy()
-
-    if isinstance(de_table, pd.DataFrame) and isinstance(de_table_comp, pd.DataFrame) and len(de_table) == len(
-            de_table_comp):
-        comparison = de_table[column].reset_index(drop=True) == de_table_comp[column].reset_index(drop=True)
-        # You can then use this comparison result in your application
-        # For example, let's just print it for now
-        print(comparison)
-
-    dataset = {'de_table_comp': df.to_json(orient='split', date_format='iso')}
-    data = create_de_table_comp(df, 'de_table_comp')
-
-    return json.dumps(dataset), data
-
-'''
-
-@app.callback(
-    [Output('de_table_comparison', 'children'),
-    Output('table-box', 'children')],
+     Output('table-box', 'children')],
     [Input('add_de_table', 'n_clicks_timestamp'),
      Input('clear_de_table', 'n_clicks_timestamp')],
     [State('DE-table', 'data'),
@@ -895,7 +861,8 @@ def add_de_set(btn_add: int, btn_clear: int, de_table: List[dict],
         raise PreventUpdate
 
     if btn_clear is not None and btn_clear > btn_add:
-        return json.dumps({'de_table_comp': pd.DataFrame({'hgnc': []}).to_json(orient='split', date_format='iso')}), None
+        return json.dumps(
+            {'de_table_comp': pd.DataFrame({'hgnc': []}).to_json(orient='split', date_format='iso')}), None
 
     de_table = pd.DataFrame.from_dict(de_table) if de_table else pd.DataFrame()
 
@@ -913,12 +880,12 @@ def add_de_set(btn_add: int, btn_clear: int, de_table: List[dict],
     de_table_sorted['rank'] = range(1, len(de_table_sorted) + 1)
 
     print(de_table_sorted)
-   # print(detable_comp)
+    # print(detable_comp)
 
     intermediate_data = json.loads(intermediate_data)
 
     if detable_comp is not None:
-        #if comparison table is already >2
+        # if comparison table is already >2
         detable_comp = detable_comp.sort_values(by=['log2FoldChange'], ascending=True)
         detable_comp = range(1, len(detable_comp) + 1)
         detable_comp = detable_comp.reindex(de_table_sorted.index)
@@ -938,14 +905,16 @@ def add_de_set(btn_add: int, btn_clear: int, de_table: List[dict],
 
     return json.dumps(dataset), data
 
+
 background_pipe = {
-            'width': '15px',
-            'height': '40px',
-            'backgroundColor': '#4CB5F5',
-            'z-index': '1',
-            'left': '20%',
-            'position': 'relative',
-        }
+    'width': '15px',
+    'height': '40px',
+    'backgroundColor': '#4CB5F5',
+    'z-index': '1',
+    'left': '20%',
+    'position': 'relative',
+}
+
 
 ##main table: intermediate-table
 @app.callback(
@@ -966,12 +935,11 @@ background_pipe = {
     State('variable_selection2_store', 'data'),
     State('variable_selection3_store', 'data'),
     prevent_initial_call=True)
-def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_run, df_counts, df_info, variable_selection1, variable_selection2, variable_selection3):
+def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_run, df_counts, df_info,
+                      variable_selection1, variable_selection2, variable_selection3):
     if n_clicks is 0:
         raise PreventUpdate
     else:
-
-
 
         if df_counts is not None:
             df_counts = pd.read_json(df_counts, orient='split')
@@ -995,12 +963,12 @@ def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_r
                 if len(lSamples) == 0:
 
                     df_info_temp = df_info.loc[
-                        df_info.loc[df_info[variable_selection1].isin(var1_dropdown),].index]
+                        df_info.loc[df_info[variable_selection1].isin(var1_dropdown), ].index]
 
                     df_info_temp = df_info_temp.loc[
-                        df_info_temp.loc[df_info_temp[variable_selection2].isin(var2_dropdown),].index]
+                        df_info_temp.loc[df_info_temp[variable_selection2].isin(var2_dropdown), ].index]
 
-                    df_info_temp = df_info_temp.loc[df_info_temp[variable_selection3].isin(var3_dropdown),]
+                    df_info_temp = df_info_temp.loc[df_info_temp[variable_selection3].isin(var3_dropdown), ]
 
                     if exclude:
                         for sample_excl in exclude:
@@ -1013,7 +981,7 @@ def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_r
 
                 if fulltext:
                     df_counts_raw = df_counts[df_info_temp.index]
-                    #df_info_temp[['id_tissue', variable_selection2]].apply(lambda x: '_'.join(x), axis=1)
+                    # df_info_temp[['id_tissue', variable_selection2]].apply(lambda x: '_'.join(x), axis=1)
                     df_info_temp.index = df_info_temp['samples']
                     # Change names in count files
                     df_counts_raw.columns = df_info_temp.index
@@ -1037,7 +1005,7 @@ def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_r
                 df_counts_raw.to_csv(name_counts_for_pca, sep='\t')
                 df_info_temp.to_csv(name_meta_for_pca, sep='\t')
 
-                name_out =  './data/generated/'+ file_string +'_normalized.tab'
+                name_out = './data/generated/' + file_string + '_normalized.tab'
                 cmd = 'Rscript ./functions/normalize_vsd_rlog_removebatch2.R %s %s %s %s %s' % (
                     name_counts_for_pca, name_meta_for_pca, rm_confounding, name_out, transformation)
 
@@ -1060,9 +1028,7 @@ def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_r
                             'counts_raw_file_name': json.dumps(name_counts_for_pca),
                             'perf_file': json.dumps(name_out),
                             'file_string': json.dumps(file_string)}
-                            #'prefix_sub': json.dumps(sPrefix_tissue_batch_type)}
-
-
+                # 'prefix_sub': json.dumps(sPrefix_tissue_batch_type)}
 
             alert_mess = 'Data loaded successfully.'
 
@@ -1072,11 +1038,10 @@ def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_r
             raise PreventUpdate
 
 
-
 @app.callback(
     Output('barplot', 'figure'),
     Input('intermediate-table', 'children'),
-     Input('meta_dropdown_groupby', 'value'),
+    Input('meta_dropdown_groupby', 'value'),
     State('variable_selection1_store', 'data'),
     State('variable_selection2_store', 'data'),
     State('variable_selection3_store', 'data'))
@@ -1088,10 +1053,10 @@ def update_output1(indata, meta_dropdown_groupby, variable1, variable2, variable
         df_meta_temp = pd.read_json(datasets['meta'], orient='split')
         ltraces = []
 
-        #Variable3 == batch variable
+        # Variable3 == batch variable
 
         for x in df_meta_temp[meta_dropdown_groupby].unique():
-            df_temp = df_meta_temp.loc[df_meta_temp[meta_dropdown_groupby] == x,]
+            df_temp = df_meta_temp.loc[df_meta_temp[meta_dropdown_groupby] == x, ]
             df_temp = df_temp.groupby(variable3).count()
             trace = go.Bar(x=df_temp.index, y=df_temp['id_tissue'], name=x)
             ltraces.append(trace)
@@ -1102,12 +1067,13 @@ def update_output1(indata, meta_dropdown_groupby, variable1, variable2, variable
             )
         }
 
+
 @app.callback(
     [Output('volcanoplot', 'figure')],
     [Input('volcanoplot-input', 'value'),
      Input('intermediate-DEtable', 'children'),
      Input('pvalue', 'children')],
-     [State('volcano_xaxis', 'value'),
+    [State('volcano_xaxis', 'value'),
      State('volcano_yaxis', 'value')])
 def generate_volcano(effects, indata, psig, xaxis, yaxis):
     if indata is None:
@@ -1133,10 +1099,9 @@ def generate_volcano(effects, indata, psig, xaxis, yaxis):
             highlight = False
             logp = False
 
-
         radiode = datasets['DE_type']
-        title_ = datasets['title']
-        #pval = 'padj'
+        title_ = datasets['file_string']
+        # pval = 'padj'
 
         pval = yaxis
         effect_size = xaxis
@@ -1155,6 +1120,7 @@ def generate_volcano(effects, indata, psig, xaxis, yaxis):
             highlight=highlight)
         return [dashVolcano]
 
+
 @app.callback(
     Output('biplot_text_radio', 'options'),
     [Input('biplot_radio', 'value')])
@@ -1162,26 +1128,25 @@ def set_biplot_options(selected):
     try:
         if selected[0] == 'biplot':
             return [{'label': k, 'value': k} for k in ['None', 'Text']]
-    except:
-        #Biplot not selected
+    except IndexError:
+        # Biplot not selected
         return []
+
 
 @app.callback(
     Output('hpa_graph', 'figure'),
     [Input('gene_list', 'value'),
      Input('radio_symbol', 'value'),
      Input('input-2_hgnc', 'value')
-    ])
+     ])
 def update_hpa(lgenes, input_symbol, lgenes_hgnc):
-
     if lgenes_hgnc:
-
         dTranslate = dict(df_symbol_sym_ind.loc[lgenes_hgnc]['ensembl_gene_id'])
         lgenes_hgnc = [dTranslate[x] for x in lgenes_hgnc]
         lgenes = lgenes + lgenes_hgnc
 
     lgenes = [x for x in lgenes if x in df_hpa.index]
-    hpa_table = df_hpa.loc[lgenes, ]
+    hpa_table = df_hpa.loc[lgenes,]
 
     traces = []
     if input_symbol == 'Symbol':
@@ -1191,12 +1156,13 @@ def update_hpa(lgenes, input_symbol, lgenes_hgnc):
         lgenes = [dTranslate.get(x, x) for x in lgenes]
 
     for gene in lgenes:
-        traces.append(go.Bar(name=gene, x=hpa_table.loc[gene, ]['Tissue'], y=hpa_table.loc[gene, ]['NX']))
+        traces.append(go.Bar(name=gene, x=hpa_table.loc[gene,]['Tissue'], y=hpa_table.loc[gene,]['NX']))
 
     return {'data': traces,
-     'layout': go.Layout(title='', autosize=True, boxmode='group',
-                         margin={"l": 200, "b": 100, "r": 200}, xaxis={"showticklabels": True},
-                         yaxis={"title": "NX"})}
+            'layout': go.Layout(title='', autosize=True, boxmode='group',
+                                margin={"l": 200, "b": 100, "r": 200}, xaxis={"showticklabels": True},
+                                yaxis={"title": "NX"})}
+
 
 @app.callback(
     Output('indicator-graphic2', 'figure'),
@@ -1206,7 +1172,7 @@ def update_hpa(lgenes, input_symbol, lgenes_hgnc):
      Input('radio_symbol', 'value'),
      Input('radio-grouping', 'value'),
      Input('input-2_hgnc', 'value')
-    ])
+     ])
 def update_output1(indata, indata_de, lgenes, input_symbol, radio_grouping, lgenes_hgnc):
     if indata is None:
         raise PreventUpdate
@@ -1219,7 +1185,7 @@ def update_output1(indata, indata_de, lgenes, input_symbol, radio_grouping, lgen
         try:
             datasets_de = json.loads(indata_de)
             df_degenes = pd.read_json(datasets_de['de_table'], orient='split')
-            df_degenes = df_degenes.loc[df_degenes['padj'] <= 0.05, ]
+            df_degenes = df_degenes.loc[df_degenes['padj'] <= 0.05,]
             sig_gene = 1
 
         except:
@@ -1234,7 +1200,6 @@ def update_output1(indata, indata_de, lgenes, input_symbol, radio_grouping, lgen
 
         if input_symbol == 'Symbol':
             dTranslate = dict(df_symbol.loc[lgenes]['hgnc_symbol'])
-
 
         traces = []
         lgrps = []
@@ -1261,13 +1226,14 @@ def update_output1(indata, indata_de, lgenes, input_symbol, radio_grouping, lgen
             try:
                 signif = ''
                 df_gene_t = df_counts_temp.loc[g][lSamples]
-                #Mark significant genes
+                # Mark significant genes
                 if sig_gene:
                     if g in df_degenes.index:
                         signif = '*'
 
                 traces.append(go.Box(x=lgrps, y=df_gene_t, text=df_gene_t.index,
-                                     name=dTranslate.get(g, g)+signif, marker={"size": 4}, boxpoints='all', pointpos=0,
+                                     name=dTranslate.get(g, g) + signif, marker={"size": 4}, boxpoints='all',
+                                     pointpos=0,
                                      jitter=0.3))
             except:
                 pass
@@ -1296,7 +1262,7 @@ def clicked_out(clickData):
     Output('pca_correlation', 'figure'),
     Input('intermediate-table', 'children'),
     Input('meta_dropdown_groupby', 'value'),
-    #Input('input-gene', 'value'),
+    # Input('input-gene', 'value'),
     Input('sample_names_toggle', 'on'),
     Input('number_of_genes', 'value'),
     Input('biplot_radio', 'value'),
@@ -1304,7 +1270,6 @@ def clicked_out(clickData):
     Input('meta_dropdown', 'value'))
 def update_pca_and_barplot(indata, meta_dropdown_groupby, sample_names_toggle, number_of_genes, biplot_radio,
                            biplot_text_radio, dropdown):
-
     if indata is None:
         raise PreventUpdate
     else:
@@ -1322,7 +1287,7 @@ def update_pca_and_barplot(indata, meta_dropdown_groupby, sample_names_toggle, n
         principalComponents = pca.fit_transform(df_counts_pca.T)
         principalDf = pd.DataFrame(data=principalComponents, columns=['PCA1', 'PCA2', 'PCA3'])
         principalDf.index = df_counts_pca.columns
-        #print(principalDf)
+        # print(principalDf)
         principalDf[dropdown] = df_meta_temp.loc[principalDf.index,][dropdown]
         traces = []
         ltraces3d = []
@@ -1340,10 +1305,10 @@ def update_pca_and_barplot(indata, meta_dropdown_groupby, sample_names_toggle, n
             if sample_names_toggle:
                 mode_ = 'markers+text'
             else:
-                mode_ = 'markers'#
+                mode_ = 'markers'  #
 
             traces.append(go.Scatter(x=principalDf['PCA1'], y=principalDf['PCA2'],
-                                     marker={'size': 14, 'colorbar': {'title':'--'},
+                                     marker={'size': 14, 'colorbar': {'title': '--'},
                                              'color': df_meta_temp[dropdown]},
                                      text=principalDf.index, mode=mode_, textposition='top center', showlegend=False))
 
@@ -1351,7 +1316,6 @@ def update_pca_and_barplot(indata, meta_dropdown_groupby, sample_names_toggle, n
 
             for grp in df_meta_temp[dropdown].unique():
                 principalDf_temp = principalDf[principalDf[dropdown] == grp]
-
 
                 if sample_names_toggle:
                     traces.append(
@@ -1362,7 +1326,7 @@ def update_pca_and_barplot(indata, meta_dropdown_groupby, sample_names_toggle, n
                         x=principalDf_temp['PCA1'], y=principalDf_temp['PCA2'], z=principalDf_temp['PCA3'],
                         name=grp,
                         text=principalDf_temp.index, mode='markers+text', marker={'size': 8, 'opacity': 0.8,
-                        }))
+                                                                                  }))
 
                 else:
                     traces.append(
@@ -1372,9 +1336,7 @@ def update_pca_and_barplot(indata, meta_dropdown_groupby, sample_names_toggle, n
                         x=principalDf_temp['PCA1'], y=principalDf_temp['PCA2'], z=principalDf_temp['PCA3'],
                         name=grp,
                         text=principalDf_temp.index, mode='markers', marker={'size': 8, 'opacity': 0.8,
-                        }))
-
-
+                                                                             }))
 
         trace_var = [go.Bar(x=principalDf.columns, y=pca.explained_variance_ratio_)]
 
@@ -1432,7 +1394,7 @@ def update_pca_and_barplot(indata, meta_dropdown_groupby, sample_names_toggle, n
             'type': 'heatmap',
         })
 
-        width_cor = correlation_matrix.shape[0]*10
+        width_cor = correlation_matrix.shape[0] * 10
         return {'data': traces,
                 'layout': go.Layout(title='Expression values', autosize=True, boxmode='group',
                                     margin={"l": 200, "b": 100, "r": 200},
@@ -1441,7 +1403,7 @@ def update_pca_and_barplot(indata, meta_dropdown_groupby, sample_names_toggle, n
                {"data": ltraces3d,
                 "layout": go.Layout(
                     height=700, title="...",
-                    #paper_bgcolor="#f3f3f3",
+                    # paper_bgcolor="#f3f3f3",
                     scene={"aspectmode": "cube", "xaxis": {"title": "PCA1 %.3f" % pca.explained_variance_ratio_[0], },
                            "yaxis": {"title": "PCA2 %.3f" % pca.explained_variance_ratio_[1], },
                            "zaxis": {"title": "PCA3 %.3f" % pca.explained_variance_ratio_[2], }},
@@ -1450,19 +1412,20 @@ def update_pca_and_barplot(indata, meta_dropdown_groupby, sample_names_toggle, n
                 'layout': go.Layout(title='', autosize=True, boxmode='group',
                                     margin={"l": 200, "b": 100, "r": 200}, xaxis={"showticklabels": True},
                                     yaxis={"title": "Variance explained"})}, \
-                {'data': lPCA_data,
-                     'layout': {
-                        'height': 500,
-                        'width': 1500,
-                        'xaxis': {'side': 'top'},
-                        'margin': {
-                            'l': 200,
-                            'r': 200,
-                            'b': 150,
-                            't': 100
-                        }
+               {'data': lPCA_data,
+                'layout': {
+                    'height': 500,
+                    'width': 1500,
+                    'xaxis': {'side': 'top'},
+                    'margin': {
+                        'l': 200,
+                        'r': 200,
+                        'b': 150,
+                        't': 100
                     }
                 }
+                }
+
 
 @app.callback(Output('datasets', 'options'),
               Input('dataset_loader_start', 'children'))
@@ -1478,18 +1441,19 @@ def populate_dataset_load(invalue):
             return []
     else:
         return []
-    #options = [{'label': j, 'value': j} for j in lPapers], value = 'New'
+    # options = [{'label': j, 'value': j} for j in lPapers], value = 'New'
+
 
 @app.callback(
     [Output('DE-table', 'data'),
      Output('pvalue', 'children'),
      Output('number_of_degenes', 'children'),
-     Output('de_to_enrichr_block', 'style'),],
+     Output('de_to_enrichr_block', 'style'), ],
     [Input('sig_submit', 'n_clicks')],
     [State('volcanoplot-input', 'value'),
      State('intermediate-DEtable', 'children'),
      State('toggle_sig', 'value'),
-     State('toggle_basemean', 'value')],)
+     State('toggle_basemean', 'value')], )
 def update_de_table(n_clicks, effects, indata, sig_value, basemean):
     if n_clicks is None:
         raise PreventUpdate
@@ -1500,29 +1464,29 @@ def update_de_table(n_clicks, effects, indata, sig_value, basemean):
             datasets = json.loads(indata)
             print('update_de_table')
             df_degenes = pd.read_json(datasets['de_table'], orient='split')
-            #print(df_degenes)
+            # print(df_degenes)
             radiode = datasets['DE_type']
-            df_degenes = df_degenes.loc[df_degenes['padj'] <= float(sig_value), ]
+            df_degenes = df_degenes.loc[df_degenes['padj'] <= float(sig_value),]
             if 'baseMean' in df_degenes.columns:
-                df_degenes = df_degenes.loc[df_degenes['baseMean'] >= float(basemean), ]
+                df_degenes = df_degenes.loc[df_degenes['baseMean'] >= float(basemean),]
 
             overlap_genes = list(set(df_degenes.index).intersection(set(df_symbol.index)))
             dTranslate2 = dict(df_symbol.loc[overlap_genes]['wikigene_description'])
             df_degenes['wikigene_desc'] = [dTranslate2.get(x, x) for x in df_degenes.index]
-            df_degenes1 = df_degenes.loc[df_degenes['log2FoldChange'] < effects[0], ]
-            df_degenes2 = df_degenes.loc[df_degenes['log2FoldChange'] > effects[1], ]
+            df_degenes1 = df_degenes.loc[df_degenes['log2FoldChange'] < effects[0],]
+            df_degenes2 = df_degenes.loc[df_degenes['log2FoldChange'] > effects[1],]
 
             df_degenes = pd.concat([df_degenes1, df_degenes2])
             number_of_degenes = df_degenes.shape[0]
-            #number_of_degenes = '#DE-genes: ' + str(number_of_degenes) + ' / ' + str(df_counts_combined.shape[0]), \
+            # number_of_degenes = '#DE-genes: ' + str(number_of_degenes) + ' / ' + str(df_counts_combined.shape[0]), \
             #                    ' (%s | %s)'%(df_degenes1.shape[0], df_degenes2.shape[0]), ' Fold Change: %s %s'\
             #                    %(effects[0], effects[1])
 
-            name = datasets['title']+'_'+str(effects[0])+'_'+str(effects[1]) + '_de.tab'
+            name = datasets['file_string'] + '_' + str(effects[0]) + '_' + str(effects[1]) + '_de.tab'
             overlap_genes = list(set(df_degenes.index).intersection(set(df_symbol.index)))
             dTranslate = dict(df_symbol.loc[overlap_genes]['hgnc_symbol'])
             df_degenes['hgnc'] = [dTranslate.get(x, x) for x in df_degenes.index]
-            df_degenes.to_csv('data/generated/%s' %name, sep='\t')
+            df_degenes.to_csv('data/generated/%s' % name, sep='\t')
 
             return df_degenes.to_dict('records'), sig_value, number_of_degenes, background_pipe
 
@@ -1541,24 +1505,24 @@ def export_de(n_clicks, indata, prefixes):
             datasets = json.loads(indata)
             df_degenes = pd.read_json(datasets['de_table'], orient='split')
             df_degenes['hgnc'] = [dTranslate.get(x, x) for x in df_degenes.index]
-            file_string = json.loads('file_string')
-            #prefixes = json.loads(prefixes)
-            #lTotal = json.loads(prefixes['prefixes'])
-            #sTotal = '_'.join(lTotal)
-            #sTotal = sTotal + '_for_DEplot.tab'
+            file_string = datasets['file_string']
+            # prefixes = json.loads(prefixes)
+            # lTotal = json.loads(prefixes['prefixes'])
+            # sTotal = '_'.join(lTotal)
+            # sTotal = sTotal + '_for_DEplot.tab'
             de_file_for_plot = file_string + '_for_DEplot.tab'
 
-            df_degenes.to_csv('data/generated/%s' %de_file_for_plot, sep='\t')
-            print('Written to file: %s' %de_file_for_plot)
+            df_degenes.to_csv('data/generated/%s' % de_file_for_plot, sep='\t')
+            print('Written to file: %s' % de_file_for_plot)
 
-            return ['Written to file: %s' %de_file_for_plot]
+            return ['Written to file: %s' % de_file_for_plot]
 
         else:
             print('Run DE analysis first')
             return ['Nothing to export']
 
 
-#DE ANALYSIS
+# DE ANALYSIS
 @app.callback(
     Output('intermediate-DEtable', 'children'),
     Output('temp', 'children'),
@@ -1568,7 +1532,7 @@ def export_de(n_clicks, indata, prefixes):
     State('program', 'value'),
     State('transformation', 'value'),
     State('force_run', 'on'),
-    State('rowsum','value'),
+    State('rowsum', 'value'),
     State('design', 'value'),
     State('reference', 'value'))
 def run_DE_analysis(n_clicks, indata, program, transformation, force_run, rowsum, design, reference):
@@ -1576,7 +1540,7 @@ def run_DE_analysis(n_clicks, indata, program, transformation, force_run, rowsum
         raise PreventUpdate
     else:
         datasets = json.loads(indata)
-        #df_meta_temp = pd.read_json(datasets['meta'], orient='split')
+        # df_meta_temp = pd.read_json(datasets['meta'], orient='split')
         outdir = './data/generated/'
         name_counts = json.loads(datasets['counts_raw_file_name'])
         file_string = json.loads(datasets['file_string'])
@@ -1601,10 +1565,10 @@ def run_DE_analysis(n_clicks, indata, program, transformation, force_run, rowsum
 
         df_log.to_csv(logfile, index=False)
 
-        #lTotal = json.loads(datasets['prefixes'])
-        #sTotal = '_'.join(lTotal)
-        #file_string_program = lTotal + [program]
-        #sTotalDE = sTotal + '_' + program
+        # lTotal = json.loads(datasets['prefixes'])
+        # sTotal = '_'.join(lTotal)
+        # file_string_program = lTotal + [program]
+        # sTotalDE = sTotal + '_' + program
 
         name_meta = './data/generated/' + ''.join(file_string) + '_meta.tab'
         name_out = './data/generated/' + ''.join(file_string) + '_DE.tab'
@@ -1627,7 +1591,7 @@ def run_DE_analysis(n_clicks, indata, program, transformation, force_run, rowsum
                 name_out)
         '''
 
-        #else:
+        # else:
         #    print('ERROR radio_de')
 
         if not os.path.isfile(name_out):
@@ -1652,7 +1616,7 @@ def run_DE_analysis(n_clicks, indata, program, transformation, force_run, rowsum
         dTranslate = dict(df_symbol.loc[overlap_genes]['hgnc_symbol'])
 
         df_degenes['hgnc'] = [dTranslate.get(x, x) for x in df_degenes.index]
-        datasets = {'de_table': df_degenes.to_json(orient='split'), 'DE_type': program, 'title': file_string}
+        datasets = {'de_table': df_degenes.to_json(orient='split'), 'DE_type': program, 'file_string': file_string}
 
         print('DE done')
         return json.dumps(datasets), 'temp', ''
@@ -1665,12 +1629,14 @@ def run_DE_analysis(n_clicks, indata, program, transformation, force_run, rowsum
 def enrichr_tab_out(in1):
     return in1
 
+
 @app.callback(
     Output('Enrichr_GO_bp_dn', 'figure'),
     Input('Enrichr_GO_bp_dn_ph', 'figure')
 )
 def enrichr_tab_out(in1):
     return in1
+
 
 @app.callback(
     Output('Enrichr_GO_cell_up', 'figure'),
@@ -1679,18 +1645,22 @@ def enrichr_tab_out(in1):
 def enrichr_tab_out(in1):
     return in1
 
+
 @app.callback(
     Output('Enrichr_GO_cell_dn', 'figure'),
     Input('Enrichr_GO_cell_dn_ph', 'figure')
 )
 def enrichr_tab_out(in1):
     return in1
+
+
 @app.callback(
     Output('Enrichr_GO_mf_up', 'figure'),
     Input('Enrichr_GO_mf_up_ph', 'figure')
 )
 def enrichr_tab_out(in1):
     return in1
+
 
 @app.callback(
     Output('Enrichr_GO_mf_dn', 'figure'),
@@ -1699,12 +1669,14 @@ def enrichr_tab_out(in1):
 def enrichr_tab_out(in1):
     return in1
 
+
 @app.callback(
     Output('Enrichr_kegg_up', 'figure'),
     Input('Enrichr_kegg_up_ph', 'figure')
 )
 def enrichr_tab_out(in1):
     return in1
+
 
 @app.callback(
     Output('Enrichr_kegg_dn', 'figure'),
@@ -1713,17 +1685,18 @@ def enrichr_tab_out(in1):
 def enrichr_tab_out(in1):
     return in1
 
+
 ##Enrichr
 @app.callback(
     [Output('Enrichr_GO_bp_up_ph', 'figure'),
-    Output('Enrichr_GO_bp_dn_ph', 'figure'),
-    Output('Enrichr_GO_cell_up_ph', 'figure'),
-    Output('Enrichr_GO_cell_dn_ph', 'figure'),
-    Output('Enrichr_GO_mf_up_ph', 'figure'),
-    Output('Enrichr_GO_mf_dn_ph', 'figure'),
-    Output('Enrichr_kegg_up_ph', 'figure'),
-    Output('Enrichr_kegg_dn_ph', 'figure'),
-    Output('submit_done_enrichr', 'children')],
+     Output('Enrichr_GO_bp_dn_ph', 'figure'),
+     Output('Enrichr_GO_cell_up_ph', 'figure'),
+     Output('Enrichr_GO_cell_dn_ph', 'figure'),
+     Output('Enrichr_GO_mf_up_ph', 'figure'),
+     Output('Enrichr_GO_mf_dn_ph', 'figure'),
+     Output('Enrichr_kegg_up_ph', 'figure'),
+     Output('Enrichr_kegg_dn_ph', 'figure'),
+     Output('submit_done_enrichr', 'children')],
     Input('btn-enrichr', 'n_clicks'),
     State('intermediate-DEtable', 'children'),
     State('DE-table', 'data'),
@@ -1736,10 +1709,10 @@ def enrichr_up(n_clicks, indata, indata_de, sig_value):
         df_degenes = pd.DataFrame.from_dict(indata_de)
 
         radiode = datasets['DE_type']
-        file_string = datasets['title']
+        file_string = datasets['file_string']
         #
         l_databases = ['GO_Biological_Process_2018', 'GO_Cellular_Component_2018', 'GO_Molecular_Function_2018',
-                      'KEGG_2016']
+                       'KEGG_2016']
         lOutput = []
         lUpDn = ['up', 'dn']
         out_folder = 'data/generated/enrichr'
@@ -1750,12 +1723,12 @@ def enrichr_up(n_clicks, indata, indata_de, sig_value):
             cmd = 'mkdir %s' % out_folder
             os.system(cmd)
 
-        df_degenes = df_degenes.loc[df_degenes['padj'] <= float(sig_value), ]
-        #else:
-        #df_degenes = df_degenes.loc[df_degenes['pvalue'] <= float(sig_value), ]
+        df_degenes = df_degenes.loc[df_degenes['padj'] <= float(sig_value),]
+        # else:
+        # df_degenes = df_degenes.loc[df_degenes['pvalue'] <= float(sig_value), ]
 
-        df_degenes_up = df_degenes.loc[df_degenes['log2FoldChange'] > 0, ]
-        df_degenes_dn = df_degenes.loc[df_degenes['log2FoldChange'] < 0, ]
+        df_degenes_up = df_degenes.loc[df_degenes['log2FoldChange'] > 0,]
+        df_degenes_dn = df_degenes.loc[df_degenes['log2FoldChange'] < 0,]
 
         genes_path_all = prefix + '_DE_genes.txt'
         wf = open(genes_path_all, 'w')
@@ -1777,7 +1750,7 @@ def enrichr_up(n_clicks, indata, indata_de, sig_value):
 
                 if len(df_degenes['hgnc']) > 5:
 
-                    #if not os.path.isfile(genes_path):
+                    # if not os.path.isfile(genes_path):
                     wf = open(genes_path, 'w')
                     for hgnc in df_degenes['hgnc']:
                         if not hgnc == None:
@@ -1790,7 +1763,7 @@ def enrichr_up(n_clicks, indata, indata_de, sig_value):
                     # Dont perform the same analysis again
                     if not os.path.isfile(fOut):
                         cmd = 'python3 ./enrichr-api/query_enrichr_py3.py %s %s %s %s' % (
-                        genes_path, updn + '_' + db, db, fOut)
+                            genes_path, updn + '_' + db, db, fOut)
                         os.system(cmd)
 
                     df = pd.read_csv(fOut + '.txt', sep='\t', index_col=None)
@@ -1814,21 +1787,19 @@ def enrichr_up(n_clicks, indata, indata_de, sig_value):
 
                     output = {'data': trace,
                               'layout': go.Layout(title=db + '_' + updn)
-                    }
+                              }
                 else:
                     trace = [go.Bar()]
                     output = {'data': trace,
                               'layout': go.Layout(title=db + '_' + updn)
-                    }
+                              }
 
                 lOutput.append(output)
 
     return lOutput[0], lOutput[1], lOutput[2], lOutput[3], lOutput[4], lOutput[5], lOutput[6], lOutput[7], ''
 
 if __name__ == "__main__":
-    #app.run_server(debug=True, host='130.238.239.158')
+    # app.run_server(debug=True, host='130.238.239.158')
     ascii_banner = pyfiglet.figlet_format("RNA analysis")
     print(ascii_banner)
     app.run_server(debug=True, host='localhost')
-
-

@@ -727,10 +727,17 @@ layout_page1 = html.Div(style={'backgroundColor': '#f5f5f5','padding': '25px'},
 
 layout_index = html.Div([
     dbc.Container([
+       html.Div([
+        html.H5('Upload your counts with corresponding info file and get started!'),
+        html.Div(
+            id='help_info_div',
+            children=[
+                html.Img(src=b64_image('assets/help_info.png'), height='25', width='25', title='info here'),
+                ],
+                # style={'display': 'none'}  # Uncomment or modify this as needed
+        )
+        ], style={'padding': '25px', 'display': 'flex', 'alignItems': 'center'}),
         html.Div([
-           html.H5('Upload your counts with corresponding info file and get started!'),
-        ], style={'padding': '25px'}),
-
             html.Div([
                 html.Div(
                          children=[
@@ -759,7 +766,7 @@ layout_index = html.Div([
                                 html.Img(src=b64_image('assets/checkmark.jpg'), height='60',width='60'),
                             ], style={'display':'none'})
 
-            ],style={'width':'100%', 'display': 'flex', 'justify-content': 'space-between'}),
+            ],style={'width':'100%', 'display': 'flex', 'justify-content': 'space-between', 'align-items': 'center'}),
 
                 html.Div([
                     dcc.Upload(
@@ -786,7 +793,7 @@ layout_index = html.Div([
                              ], style={'display': 'none'})
 
                 ], style={'width':'100%', 'display': 'flex', 'justify-content': 'space-between'}),
-            ], style={'display': 'flex', 'justify-content': 'space-between'}),
+            ], style={'display': 'flex', 'justify-content': 'space-between', 'align-items': 'center'}),
 
         html.Div(id='alert_import_div', children=[
                 dmc.Alert(
@@ -847,6 +854,6 @@ layout_index = html.Div([
         #dcc.Link('WGCNA + Enrichr', href='/page-2'),
         #html.Div(id='df_counts', style={'display': 'none'}),
         #html.Div(id='df_info', style={'display': 'none'}),
-
-    ], style={'verticalAlign': 'center', 'border': '1px solid #C6CCD5', 'border-radius': '5px', 'padding': '50px', 'margin': '10%'}),
+    ], style={'align-items': 'center', 'verticalAlign': 'center', 'align-content': 'center', 'justify-content': 'center', 'width': '100%', 'display': 'flex', 'flex-direction': 'column'}),
+    ], style={'verticalAlign': 'center', 'border': '1px solid #C6CCD5', 'border-radius': '5px', 'padding': '50px', 'margin': '10%', }),
 ])
