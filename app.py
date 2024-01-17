@@ -1081,7 +1081,6 @@ def update_output1(indata, meta_dropdown_groupby, variable1, variable2, variable
             )
         }
 
-
 @app.callback(
     [Output('volcanoplot', 'figure')],
     [Input('volcanoplot-input', 'value'),
@@ -1134,7 +1133,6 @@ def generate_volcano(effects, indata, psig, xaxis, yaxis):
             highlight=highlight)
         return [dashVolcano]
 
-
 @app.callback(
     Output('biplot_text_radio', 'options'),
     [Input('biplot_radio', 'value')])
@@ -1145,7 +1143,6 @@ def set_biplot_options(selected):
     except IndexError:
         # Biplot not selected
         return []
-
 
 @app.callback(
     Output('hpa_graph', 'figure'),

@@ -388,7 +388,7 @@ layout_page1 = html.Div(style={'backgroundColor': '#f5f5f5','padding': '25px'},
                 dbc.Input(id='number_of_genes', type='text', placeholder='All Genes',
                           style={'width': '300px', 'height': '35px', 'padding': '20px', 'margin-right': '100px'}),
                 html.P('Color by:',
-                       style={'width': '100px', 'margin-left': '100px', 'margin-right': '10px', 'align-self': 'center',
+                       style={'width': '100px', 'margin-left': '80px', 'margin-right': '10px', 'align-self': 'center',
                               'margin': '0', 'line-height': '35px'}),
                 dcc.Dropdown(
                     id='meta_dropdown',
@@ -413,24 +413,17 @@ layout_page1 = html.Div(style={'backgroundColor': '#f5f5f5','padding': '25px'},
 
             ], style={'display': 'flex', 'align-items': 'center', 'width': '100%', 'margin-top': 5}),
 
-
-
-
             dcc.Checklist(
                 id='biplot_radio',
                 options=[{'label': 'Biplot', 'value': 'biplot'}],
                 style={'display':'none'}
             ),
 
-
-
             dcc.RadioItems(id='biplot_text_radio'),
 
-
             html.Div(children=[
-
-                              dcc.Graph(id='pca_and_barplot', style={'display': 'inline-block', 'width':'50%'}),
-                              dcc.Graph(id='barplot', style={'display': 'inline-block', 'width':'50%'})
+                dcc.Graph(id='pca_and_barplot', style={'display': 'inline-block', 'width':'50%'}),
+                dcc.Graph(id='barplot', style={'display': 'inline-block', 'width':'50%'})
                 ]),
 
             html.Div(children=[
