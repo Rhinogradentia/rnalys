@@ -5,7 +5,7 @@ import math
 import flask
 import dash
 import dash_auth
-import dash_table as dt
+#import dash_table as dt
 import pandas as pd
 import numpy as np
 import plotly.graph_objs as go
@@ -19,6 +19,7 @@ from dash import dcc
 from dash import html
 from dash import Input, Output, State
 from dash import dash_table
+from dash import dash_table as dt
 import dash_daq as daq
 from collections import Counter
 from dash.exceptions import PreventUpdate
@@ -27,7 +28,7 @@ from demos import dash_reusable_components as drc
 
 
 #Genesymbol
-df_symbol_file = './data/ensembl_symbol.csv'
+df_symbol_file =  os.path.join('.', 'data', 'ensembl_symbol.csv')
 df_symbol = pd.read_csv(df_symbol_file, sep='\t')
 df_symbol.index = df_symbol['ensembl_gene_id']
 df_symbol = df_symbol.loc[~df_symbol.index.duplicated(keep='first')]
@@ -64,23 +65,21 @@ columns = ['Ensembl', 'hgnc', 'baseMean', 'log2FoldChange', 'pvalue', 'padj']
 data = [['ens', 'hgnc1', 10, 4, 0.005, 0.9995]]
 df = pd.DataFrame(data, columns=columns)
 
+datasets_txt_path = os.path.join('data', 'datasets.txt')
 
-
-
-#Load datasets
-fDatasets = 'data/datasets.txt'
-
-if os.path.isfile('data/datasets.txt'):
+if os.path.isfile(datasets_txt_path):
     lPapers = []
-    with open(fDatasets, 'r') as f:
+    # Use the corrected path to open the file
+    with open(datasets_txt_path, 'r') as f:
         for line in f:
             sPaper = line.split()[0]
             lPapers.append(sPaper)
     lPapers.append('New')
 else:
-    os.system('touch data/datasets.txt')
+    open(datasets_txt_path, 'a').close()
 
-dataset_file_path = 'data/datasets/datasets.csv'
+
+dataset_file_path = os.path.join('data', 'datasets', 'datasets.csv')
 
 
 
@@ -313,15 +312,17 @@ layout_page1 = html.Div(style={'backgroundColor': '#f5f5f5','padding': '25px'},
 
                         html.Div([
                             dcc.RadioItems(id='radio_symbol',
-                                           options=[{'label': j, 'value': j} for j in ['Ensembl', 'Symbol']],
+                                           options=[{'label': j+' ', 'value': j} for j in ['Ensembl', 'Symbol']],
                                            value='Ensembl', labelStyle={'display': 'inline-block'}),
                         ]),
                         html.Div([
                             dcc.RadioItems(id='radio-grouping',
                                            options=[
-                                               {'label': 'Tissue', 'value': 'tissue'},
-                                               {'label': 'Type', 'value': 'type'},
-                                               {'label': 'Batch', 'value': 'SeqTag'},
+                                               #{'label': 'Tissue', 'value': 'tissue'},
+                                               {'label': 'Variable 1  ', 'value': 'var1'},
+                                               #{'label': 'Type', 'value': 'type'},
+                                               {'label': 'Variable 2  ', 'value': 'var2'},
+                                               {'label': 'Batch ', 'value': 'var3'},
                                            ],
                                            value='tissue', labelStyle={'display': 'inline-block'}),
                         ]),
@@ -720,13 +721,9 @@ layout_page1 = html.Div(style={'backgroundColor': '#f5f5f5','padding': '25px'},
 
 layout_index = html.Div([
         dbc.Container([
-        
-       
-           
-
             html.Div([
                 html.Div([
-                    html.H5('Upload your counts with corresponding info file and get started!', style={'flex-grow': 1, 'margin-left': '10px'}),
+                    html.H5('Upload counts with corresponding info file to get started!', style={'flex-grow': 1, 'margin-left': '30px'}),
                     html.Div([
                         html.I(className="fas fa-question-circle fa-lg", id="target", style={'padding': '10px'}),
                         dbc.Tooltip("Inserted count data should have columns matching index rows in meta data, the first column in the meta table should represent the sample", 
@@ -793,7 +790,7 @@ layout_index = html.Div([
                              ], style={'display': 'none'})
 
                 ], style={'width':'100%', 'display': 'flex', 'justify-content': 'space-between'}),
-            ], style={'display': 'flex', 'justify-content': 'space-between', 'align-items': 'center'}),
+            ], style={'display': 'flex', 'justify-content': 'space-between', 'align-items': 'left'}),
 
         html.Div(id='alert_import_div', children=[
                 dmc.Alert(
@@ -857,3 +854,4 @@ layout_index = html.Div([
     ], style={'align-items': 'center', 'verticalAlign': 'center', 'align-content': 'center', 'justify-content': 'center', 'width': '100%', 'display': 'flex', 'flex-direction': 'column'}),
     ], style={'verticalAlign': 'center', 'border': '1px solid #C6CCD5', 'border-radius': '5px', 'padding': '50px', 'margin': '10%', }),
 ])
+

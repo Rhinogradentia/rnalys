@@ -90,7 +90,7 @@ url_bar_and_content_div = html.Div([
 ])
 
 # Genesymbol
-df_symbol_file = './data/ensembl_symbol.csv'
+df_symbol_file = os.path.join('data', 'ensembl_symbol.csv')
 df_symbol = pd.read_csv(df_symbol_file, sep='\t')
 df_symbol.index = df_symbol['ensembl_gene_id']
 df_symbol = df_symbol.loc[~df_symbol.index.duplicated(keep='first')]
@@ -112,7 +112,8 @@ lTissue = []
 PAGE_SIZE = 10
 
 # Load Human protein atlas (consensus rna tissue)
-df_hpa = pd.read_csv('data/rna_tissue_consensus.tsv', sep='\t', index_col='Gene')
+df_hpa_file = os.path.join('data', 'rna_tissue_consensus.tsv')
+df_hpa =  pd.read_csv(df_hpa_file, sep='\t', index_col='Gene')
 
 # Setup for Enrichr
 databases_enrichr = ['TRANSFAC_and_JASPAR_PWMs', 'OMIM_Disease', 'OMIM_Expanded', 'KEGG_2016', 'BioCarta_2016',
@@ -150,10 +151,10 @@ def write_dataset(lSamples, lExclude, id_name=None):
     the dataset information to 'data/datasets/datasets.csv'.
     """
     # Generate a random filename
-    dataset_file_path = 'data/datasets/datasets.csv'
+    dataset_file_path = os.path.join('data', 'datasets', 'datasets.csv')
     sample_names = ' '.join(lSamples)
     exclude_names = ' '.join(lExclude)
-    outdir = 'data/datasets/'
+    outdir = os.path.join('data', 'datasets')
 
     if not os.path.exists(outdir):
         # If the directory doesn't exist, create it
@@ -176,7 +177,7 @@ def write_dataset(lSamples, lExclude, id_name=None):
     df.to_csv(dataset_file_path, index=False)
 
 def load_dataset(dataset_name):
-    dataset_file_path = 'data/datasets/datasets.csv'
+    dataset_file_path = os.path.join('data', 'datasets', 'datasets.csv')
 
     if os.path.isfile(dataset_file_path):
         df = pd.read_csv(dataset_file_path, index_col=False)
@@ -210,7 +211,8 @@ def write_session_to_file(sample_names, rm_confounding, transformation, file_str
 
         This function writes the session data to 'data/datasets/session_file.txt'.
     '''
-    session_file_path = 'data/datasets/session_file.txt'
+
+    session_file_path = os.path.join('data', 'datasets', 'session_file.txt')
     # Write the sample names to the file
     # > sample1 sample2 sample3 transformation %id_name %file_string
     df = pd.DataFrame({
@@ -242,8 +244,8 @@ def search_session(sample_string, transformation, rm_confounding):
     - list or None: Returns a list of file strings if a matching session is found, otherwise None.
     """
 
-    session_file_path = 'data/datasets/session_file.txt'
-    outdir = 'data/datasets/'
+    session_file_path = os.path.join('data', 'datasets', 'session_file.txt')
+    outdir = os.path.join('data', 'datasets')
 
     if not os.path.exists(outdir):
         os.makedirs(outdir)
@@ -748,25 +750,28 @@ def export_plot(n_clicks, indata, prefixes):
             # sTotal = '_'.join(lTotal)
             # sTotal = sTotal + '_for_DEplot.tab'
 
-            outdir = './data/generated/'
+            outdir = os.path.join('data', 'generated')
             de_file_for_plot = file_string + '_for_DEplot.tab'
-
-            de_file_for_plot_path = outdir + de_file_for_plot
+            de_file_for_plot_path = os.path.join(outdir, de_file_for_plot)
 
             df_degenes.to_csv(de_file_for_plot_path, sep='\t')
+            #volcano_file = file_string + '_volcano.R'
             volcano_file = file_string + '_volcano.R'
+            volcano_file_path = os.path.join('data', 'scripts', volcano_file)
+            volcano_template_path = os.path.join('data', 'templates', 'volcano_template.R')
 
             # Read in the file
-            with open('./data/templates/volcano_template.R', 'r') as file:
+            with open(volcano_template_path, 'r') as file:
                 filedata = file.read()
 
             # Replace the target string
+            #filedata = filedata.replace('infile_holder', de_file_for_plot_path)
             filedata = filedata.replace('infile_holder', de_file_for_plot_path)
-
+            
             # Write the file out again
-            with open('./data/scripts/%s' % volcano_file, 'w') as file:
+            with open(volcano_file_path, 'w') as file:
                 file.write(filedata)
-            return ['Created plot file %s' % volcano_file]
+            return [f'Created plot file {volcano_file}']
 
         else:
             print('Run DE analysis first')
@@ -958,7 +963,7 @@ def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_r
         if df_counts is not None:
             df_counts = pd.read_json(df_counts, orient='split')
             df_info = pd.read_json(df_info, orient='split')
-            out_folder = 'data/generated'
+            out_folder = os.path.join('data','generated')
             if not os.path.isdir(out_folder):
                 cmd = 'mkdir %s' % out_folder
                 os.system(cmd)
@@ -1013,15 +1018,23 @@ def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_r
                 else:
                     write_session_to_file(list(df_info_temp.index), rm_confounding, transformation, file_string)
 
-                name_counts_for_pca = './data/generated/' + file_string + '_counts.tab'
-                name_meta_for_pca = './data/generated/' + file_string + '_meta.tab'
+                
+                name_counts_for_pca = os.path.join('data', 'generated', f'{file_string}_counts.tab')
+                
+                name_meta_for_pca = os.path.join('data', 'generated', f'{file_string}_meta.tab')
 
+                # Save the dataframes to the respective files
                 df_counts_raw.to_csv(name_counts_for_pca, sep='\t')
                 df_info_temp.to_csv(name_meta_for_pca, sep='\t')
 
-                name_out = './data/generated/' + file_string + '_normalized.tab'
-                cmd = 'Rscript ./functions/normalize_vsd_rlog_removebatch2.R %s %s %s %s %s' % (
-                    name_counts_for_pca, name_meta_for_pca, rm_confounding, name_out, transformation)
+                # Construct the output path for normalized data
+                name_out = os.path.join('data', 'generated', f'{file_string}_normalized.tab')
+
+                # Construct the path for the R script in a cross-platform way
+                r_script_path = os.path.join('functions', 'normalize_vsd_rlog_removebatch2.R')
+
+                # Format the command to run the R script, using the constructed paths
+                cmd = f'Rscript {r_script_path} {name_counts_for_pca} {name_meta_for_pca} {rm_confounding} {name_out} {transformation}'
 
                 if not search_session(list(df_info_temp.index), rm_confounding, transformation):
                     print(cmd)
@@ -1182,9 +1195,12 @@ def update_hpa(lgenes, input_symbol, lgenes_hgnc):
      Input('gene_list', 'value'),
      Input('radio_symbol', 'value'),
      Input('radio-grouping', 'value'),
-     Input('input-2_hgnc', 'value')
+     Input('input-2_hgnc', 'value'),
+     State('variable_selection1_store', 'data'),
+     State('variable_selection2_store', 'data'),
+     State('variable_selection3_store', 'data'),
      ])
-def update_output1(indata, indata_de, lgenes, input_symbol, radio_grouping, lgenes_hgnc):
+def update_output1(indata, indata_de, lgenes, input_symbol, radio_grouping, lgenes_hgnc, var1, var2, var3):
     if indata is None:
         raise PreventUpdate
     else:
@@ -1216,6 +1232,17 @@ def update_output1(indata, indata_de, lgenes, input_symbol, radio_grouping, lgen
         lgrps = []
         lSamples = []
 
+        if radio_grouping == 'var1':
+            cond = var1
+        elif radio_grouping == 'var2':
+            cond = var2
+        elif radio_grouping == 'var3':
+            cond = var3
+        else:
+            print('error radio_grouping', radio_grouping, var1, var2, var3)
+        lgrouping = df_meta_temp[cond].unique()
+
+        '''
         if radio_grouping == 'tissue':
             lgrouping = df_meta_temp['tissue'].unique()
             cond = 'tissue'
@@ -1225,6 +1252,7 @@ def update_output1(indata, indata_de, lgenes, input_symbol, radio_grouping, lgen
         elif radio_grouping == 'SeqTag':
             lgrouping = df_meta_temp['SeqTag'].unique()
             cond = 'SeqTag'
+        '''
 
         print(lgrouping)
         for grp in lgrouping:
@@ -1441,7 +1469,7 @@ def update_pca_and_barplot(indata, meta_dropdown_groupby, sample_names_toggle, n
 @app.callback(Output('datasets', 'options'),
               Input('dataset_loader_start', 'children'))
 def populate_dataset_load(invalue):
-    dataset_file_path = 'data/datasets/datasets.csv'
+    dataset_file_path = os.path.join('data','datasets','datasets.csv')
 
     if os.path.exists(dataset_file_path):
         df_datasets = pd.read_csv(dataset_file_path)
@@ -1493,11 +1521,12 @@ def update_de_table(n_clicks, effects, indata, sig_value, basemean):
             #                    ' (%s | %s)'%(df_degenes1.shape[0], df_degenes2.shape[0]), ' Fold Change: %s %s'\
             #                    %(effects[0], effects[1])
 
-            name = datasets['file_string'] + '_' + str(effects[0]) + '_' + str(effects[1]) + '_de.tab'
+            name = f"{datasets['file_string']}_{effects[0]}_{effects[1]}_de.tab"
             overlap_genes = list(set(df_degenes.index).intersection(set(df_symbol.index)))
             dTranslate = dict(df_symbol.loc[overlap_genes]['hgnc_symbol'])
             df_degenes['hgnc'] = [dTranslate.get(x, x) for x in df_degenes.index]
-            df_degenes.to_csv('data/generated/%s' % name, sep='\t')
+            output_path = os.path.join('data', 'generated', name)
+            df_degenes.to_csv(output_path, sep='\t')
 
             return df_degenes.to_dict('records'), sig_value, number_of_degenes, background_pipe
 
@@ -1517,13 +1546,9 @@ def export_de(n_clicks, indata, prefixes):
             df_degenes = pd.read_json(datasets['de_table'], orient='split')
             df_degenes['hgnc'] = [dTranslate.get(x, x) for x in df_degenes.index]
             file_string = datasets['file_string']
-            # prefixes = json.loads(prefixes)
-            # lTotal = json.loads(prefixes['prefixes'])
-            # sTotal = '_'.join(lTotal)
-            # sTotal = sTotal + '_for_DEplot.tab'
             de_file_for_plot = file_string + '_for_DEplot.tab'
-
-            df_degenes.to_csv('data/generated/%s' % de_file_for_plot, sep='\t')
+            output_path = os.path.join('data', 'generated', de_file_for_plot)
+            df_degenes.to_csv(output_path, sep='\t')
             print('Written to file: %s' % de_file_for_plot)
 
             return ['Written to file: %s' % de_file_for_plot]
@@ -1552,7 +1577,7 @@ def run_DE_analysis(n_clicks, indata, program, transformation, force_run, rowsum
     else:
         datasets = json.loads(indata)
         # df_meta_temp = pd.read_json(datasets['meta'], orient='split')
-        outdir = './data/generated/'
+        outdir = os.path.join('data','generated')
         name_counts = json.loads(datasets['counts_raw_file_name'])
         file_string = json.loads(datasets['file_string'])
         logfile = outdir + file_string + '_DE.log'
@@ -1580,16 +1605,17 @@ def run_DE_analysis(n_clicks, indata, program, transformation, force_run, rowsum
         # sTotal = '_'.join(lTotal)
         # file_string_program = lTotal + [program]
         # sTotalDE = sTotal + '_' + program
+        name_meta = os.path.join('data', 'generated', f'{file_string}_meta.tab')
+        name_out = os.path.join('data', 'generated', f'{file_string}_DE.tab')
 
-        name_meta = './data/generated/' + ''.join(file_string) + '_meta.tab'
-        name_out = './data/generated/' + ''.join(file_string) + '_DE.tab'
         if program == 'DESeq2':
-            cmd = 'Rscript ./functions/run_deseq2_v2.R %s %s %s %s %s %s' % (
-                name_counts, name_meta, rowsum, design, reference, name_out)
+            r_script_path = os.path.join('functions', 'run_deseq2_v2.R')
+            cmd = f'Rscript {r_script_path} {name_counts} {name_meta} {rowsum} {design} {reference} {name_out}'
 
         elif program == 'edgeR':
-            cmd = 'Rscript ./functions/run_edgeR.R %s %s %s %s %s' % (name_counts, name_meta, design, reference,
-                                                                      name_out)
+            r_script_path = os.path.join('functions', 'run_edgeR.R')
+            cmd = f'Rscript {r_script_path} {name_counts} {name_meta} {design} {reference} {name_out}'
+
         '''
         elif program == 'limma':
             if sTotal.count('@') > 1:
@@ -1726,7 +1752,7 @@ def enrichr_up(n_clicks, indata, indata_de, sig_value):
                        'KEGG_2016']
         lOutput = []
         lUpDn = ['up', 'dn']
-        out_folder = 'data/generated/enrichr'
+        out_folder = os.path.join('data','generated','enrichr')
 
         prefix = os.path.join(out_folder, file_string)
 
