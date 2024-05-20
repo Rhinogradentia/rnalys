@@ -1,0 +1,4 @@
+program,transformation,rowsum,design,reference,timestamp
+DESeq2,vsd,10,~tissue+SeqTag,LV,2024-05-17 12:59:42.060801
+DESeq2,vsd,10,~tissue+SeqTag,LV,2024-05-17 13:03:47.786074
+DESeq2,vsd,10,~tissue+SeqTag,LV,2024-05-17 13:04:01.277421

@@ -1,137 +1,66 @@
-#Run deseq2
+# Load necessary libraries
 suppressPackageStartupMessages(library('DESeq2'))
 library("BiocParallel")
 register(MulticoreParam(4))
+library("matrixStats")
 
-args <- commandArgs(trailingOnly = TRUE)
-indata = args[1]
-insample = args[2]
-rowm = args[3]
-design = args[4]
-reference = args[5]
-outfile = args[6]
-
-#print(indata)
-#print(insample)
-#print(paste('design:', design, sep=' '))
-#print(design)
-
-#extract_first_variable <- function(input_string) {
-#  match <- regmatches(input_string, regexpr("(?<=~)\\w+(?=\\+)", input_string, perl = TRUE))
-#
-#  if (match == "") {
-#    return(NULL)
-#  } else {
-#    return(match)
-#  }
-#}
-
-
+# Function to extract the first variable from the design formula
 extract_first_variable <- function(input_string) {
   match <- regmatches(input_string, regexpr("(?<=~)\\w+", input_string, perl = TRUE))
-
-  if (match == "") {
-    return(NULL)
+  if (length(match) == 0) {
+    stop("No variable found in the design formula.")
   } else {
     return(match)
   }
 }
 
-
-run_DE <-  function (indata, insample, rowm, design, outfile, reference) {
-  #The insample table requires the column "SeqTag" and tissue
-  insample <- read.table(insample, sep='\t', header=T)
-  rownames(insample) <- insample$X
-  insample$X <- NULL
- 
-
-  #if (grepl('bin4', design, fixed = TRUE) == TRUE){
-  #  insample$age_bin4 <- cut(insample$age, b=4)
-  #}
+# Function to run DESeq2 analysis
+run_DE <- function(indata, insample, rowm, design, outfile, reference) {
+  # Read the sample information and expression data
+  insample <- read.table(insample, sep='\t', header=TRUE, row.names=1)
+  indata <- read.table(indata, sep='\t', header=TRUE, row.names=1)
   
-  #if (grepl('bin5', design, fixed = TRUE) == TRUE){
-  #  insample$age_bin5 <- cut(insample$age, b=5)
-  #}
-  
-  
-  indata <- read.table(indata, sep='\t', header=T)
-  rownames(indata) <- indata$X
-  indata$X <- NULL
-  
-  
-  #keepRows = rowSums(indata >= rowm) >= 3
-  #keepRows <- rowSums(indata) >= rowm
-  #indata <- indata[rowSums(indata >= 25) >= 0.9*dim(indata)[2],]
-  #indata <- indata[keepRows,]
-  #print(1) 
-  dds_pre <- DESeqDataSetFromMatrix(countData = indata, colData = insample, design=as.formula(design))
-  dds_pre <- DESeq(dds_pre)
-  indata_filter = indata[rowMedians(counts(dds_pre, normalize=T)) >= 10,]
-  #print(2)
-  #indata = indata[apply(indata,1,median)>=20,]
-  
-  #print('indata after fitlering')
-  #print('before filter:')
-  #print(dim(indata))
-  #print('after filter:')
-  #print(dim(indata_filter))
-  #print(head(indata_filter))
-  
-  
-  if (all(colnames(indata) == rownames(insample))){
-    print("Both the column names matches in position and names")
-  } else{
-    stop('indata and meta table does not have matching names')
+  # Ensure the column names of indata match the row names of insample
+  if (!all(colnames(indata) == rownames(insample))) {
+    stop('indata and meta table do not have matching names')
   }
   
-  #de_variable <- gsub("^(~\\s*)(\\w+)(.*)$", "\\2", design)
+  # Create DESeq dataset
+  dds_pre <- DESeqDataSetFromMatrix(countData = indata, colData = insample, design=as.formula(design))
+  dds_pre <- DESeq(dds_pre)
   
-  #de_variable <- gsub(".*\\+(\\w+).*", "\\1", design)
-  #de_variable <- gsub(".*\\+\\s*([^\\s]+)\\s*", "\\1", design)
+  # Normalize counts and filter based on row medians
+  norm_counts <- counts(dds_pre, normalized=TRUE)
+  indata_filter <- indata[rowMedians(norm_counts) >= 10,]
   
-  #if (!grepl("\\+", design)) {
-  #    de_variable <- strsplit(design, "~")[[1]][2]
-  #} else {
-  #    de_variable <- tail(strsplit(design, "\\+")[[1]], 1)
-  #} 
-  
+  # Extract the variable from the design and relevel the factor
   de_variable <- extract_first_variable(design)
-   
-  #print('de_variable')
-  #print(de_variable)
-  insample[[de_variable]] <- as.factor(insample[[de_variable]])
-  insample[[de_variable]] <- relevel(factor(insample[[de_variable]]), ref=reference)
-
-  #if (grepl('tissue', design, fixed = TRUE) == TRUE){
-  # insample$tissue = relevel(factor(insample$tissue), ref='SF')
-  #}
+  insample[[de_variable]] <- factor(insample[[de_variable]])
+  insample[[de_variable]] <- relevel(insample[[de_variable]], ref=reference)
   
-  
-  dds2 <- DESeqDataSetFromMatrix(countData = indata_filter, colData = insample, design= as.formula(design))
-  
-  print('DESeq')
-
+  # Create a new DESeq dataset with the filtered data
+  dds2 <- DESeqDataSetFromMatrix(countData = indata_filter, colData = insample, design=as.formula(design))
   dds2 <- DESeq(dds2)
   
-  print('done')
-  #resultDESeq2 = results(dds2, contrast=c('tissue', 'LV', 'RV'))
-  resultDESeq2 = results(dds2)
+  # Get results and save to output file
+  resultDESeq2 <- results(dds2)
+  res <- na.omit(resultDESeq2)
+  write.table(res, outfile, sep='\t', quote=FALSE)
+  
+  # Generate MA plot and save as PDF
   pdf('plotMA.pdf')
   plotMA(resultDESeq2)
   dev.off()
-
-  #dds2_vsd = vst(dds2)
-  #pdf('plotPCA.pdf')
-  #print(insample$type_HF)
-  #plotPCA(dds2_vsd, intgroup='type_HF')
-  #dev.off()
-  
-  res <- na.omit(resultDESeq2)
-
-  
-  write.table(res, outfile, sep='\t', quote = F)
-  
 }
 
+# Parse command-line arguments
+args <- commandArgs(trailingOnly = TRUE)
+indata <- args[1]
+insample <- args[2]
+rowm <- as.numeric(args[3])
+design <- args[4]
+reference <- args[5]
+outfile <- args[6]
 
+# Run DESeq2 analysis
 run_DE(indata, insample, rowm, design, outfile, reference)

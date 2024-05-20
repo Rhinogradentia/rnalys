@@ -38,6 +38,7 @@ import io
 import random
 import string
 from typing import List, Tuple, Any
+from io import StringIO
 from dash import dcc
 from dash import html
 from dash import dash_table
@@ -223,13 +224,12 @@ def write_session_to_file(sample_names, rm_confounding, transformation, file_str
         'file_string': [file_string]
     })
 
-    # If the file exists, read the existing data and append the new data
     if os.path.isfile(session_file_path):
-        df_existing = pd.read_csv(session_file_path)
-        df = pd.concat([df_existing, df], ignore_index=True)
-
-    # Write the DataFrame to a CSV file
-    df.to_csv(session_file_path, index=False)
+        df_existing = pd.read_csv(session_file_path, encoding='utf-8')
+        df = pd.concat([df_existing[df.columns.tolist()], df], ignore_index=True)
+        df.to_csv(session_file_path, index=False, encoding='utf-8')
+    else:
+        df.to_csv(session_file_path, index=False, encoding='utf-8')
 
 def search_session(sample_string, transformation, rm_confounding):
     """
@@ -260,11 +260,6 @@ def search_session(sample_string, transformation, rm_confounding):
     print(rm_confounding)
     print(' '.join(sample_string))
     print(transformation)
-    # if rm_confounding == None:
-    #    rm_confounding = np.nan
-
-    print(df['rm_confounding'])
-    print('rm_confounding:', df['rm_confounding'] == rm_confounding)
 
     matching_rows = df[
         (df['Sample Names'] == ' '.join(sample_string)) &
@@ -272,10 +267,35 @@ def search_session(sample_string, transformation, rm_confounding):
         (df['Transformation'] == transformation)
         ]
 
+    # Fill NaN values in 'rm_confounding' with 0
+    df['rm_confounding'] = df['rm_confounding'].fillna('0')
+
+
+    # Adjust rm_confounding parameter: treat None as 0
+    rm_confounding = '0' if rm_confounding == 'None' else rm_confounding
+
+    
+    # Condition 1: Match 'Sample Names'
+    condition_1 = df['Sample Names'] == ' '.join(sample_string)
+
+    # Condition 2: Match 'rm_confounding', directly comparing after NaN replacement
+    condition_2 = df['rm_confounding'] == rm_confounding
+
+    # Condition 2: Match 'rm_confounding', directly comparing after NaN replacement
+    # Ensure the DataFrame column is the same type as the comparison value
+    df['rm_confounding'] = df['rm_confounding'].astype(type(rm_confounding))
+    condition_2 = df['rm_confounding'] == rm_confounding
+   
+    # Condition 3: Match 'Transformation', case-insensitive
+    condition_3 = df['Transformation'].str.lower() == transformation.lower()
+    # Combine conditions to filter rows
+    matching_rows = df[condition_1 & condition_2 & condition_3]
+    
     # If there are any matching rows, return the File String value(s)
     if not matching_rows.empty:
-        return matching_rows['file_string'].tolist()
-
+        file_string_return = matching_rows['file_string'].tolist()[0]
+        return file_string_return
+    
     # If there are no matching rows, return None
     return None
 
@@ -370,8 +390,8 @@ def parse_contents(contents, filename, date):
     Input('variable_selection3', 'value'))
 def update_alert_import(df_counts, df_info, var1, var2, var3):
     if df_counts is not None and df_info is not None and var1 is None and var2 is None and var3 is None:
-        df_counts = pd.read_json(df_counts, orient='split')
-        df_info = pd.read_json(df_info, orient='split')
+        df_counts = pd.read_json(StringIO(df_counts), orient='split')
+        df_info = pd.read_json(StringIO(df_info), orient='split')
         if list(df_counts.columns) != list(df_info.index):
             list1 = set(df_counts.columns)
             list2 = set(df_info.index)
@@ -387,7 +407,7 @@ def update_alert_import(df_counts, df_info, var1, var2, var3):
             return 'check', {'display': 'none'}, {'display': 'none'}
 
     if df_counts is not None and df_info is not None and var1 is not None and var2 is not None and var3 is not None:
-        return 'check', {'display': 'none'}, {'display': 'inline-block'}
+        return 'check', {'display': 'none'}, {'float': 'right', 'margin-right': '30px'}
     else:
         raise PreventUpdate
 
@@ -398,7 +418,8 @@ def update_checkmark(df_counts):
     if df_counts is None:
         raise PreventUpdate
     else:
-        return {'display': 'inline-block', 'position': 'relative', 'top': '0px', 'left': '5px'}
+        #return {'display': 'inline-block', 'position': 'relative', 'top': '0px', 'left': '5px'}
+        return {'display': 'flex', 'alignItems': 'center', 'justifyContent': 'right'}
 
 @app.callback(
     Output("alert-dismiss", "hide"),
@@ -417,8 +438,8 @@ def update_checkmark(df_counts):
     if df_counts is None:
         raise PreventUpdate
     else:
-        return {'display': 'flex', 'position': 'relative', 'top': '10px', 'left': '10px'}
-
+        #return {'display': 'flex', 'position': 'relative', 'top': '10px', 'left': '10px'}
+        return {'display': 'flex', 'alignItems': 'center', 'justifyContent': 'right'}
 
 @app.callback(Output('df_counts', 'data'),
               Output('alert_import', 'value'),
@@ -566,7 +587,7 @@ def table_type(df_column):
               [Input('exclude_dropdown', 'value')])
 def exclude_helper(exclude, verbose=0):
     if verbose == 1:
-        print('!!!!!!!!!!!!!!!!!!!!')
+        print('!!!!!!!!exclude!!!!!!!!!!!!')
         print(exclude)
     return [json.dumps(exclude)]
 
@@ -575,7 +596,7 @@ def exclude_helper(exclude, verbose=0):
               Input('df_info', 'data'))
 def select_var1(df_info):
     if df_info is not None:
-        df_info = pd.read_json(df_info, orient='split')
+        df_info = pd.read_json(StringIO(df_info), orient='split')
         ret = [{'label': j, 'value': j} for j in df_info.columns.to_list()]
         return ret
 
@@ -586,7 +607,7 @@ def select_var1_page1(variable1_value):
     if variable1_value is None:
         raise PreventUpdate
     else:
-        print('variable1_value', variable1_value)
+        
         return variable1_value
 
 
@@ -597,7 +618,7 @@ def select_var1(df_info, variable1_value):
     if variable1_value is None:
         raise PreventUpdate
     else:
-        df_info = pd.read_json(df_info, orient='split')
+        df_info = pd.read_json(StringIO(df_info), orient='split')
         ret = [{'label': j, 'value': j} for j in df_info[str(variable1_value)].unique()]
         filtered_data = [item for item in ret if item["label"] is not None and item["value"] is not None]
         return filtered_data
@@ -607,7 +628,7 @@ def select_var1(df_info, variable1_value):
               Input('df_info', 'data'))
 def select_var2(df_info):
     if df_info is not None:
-        df_info = pd.read_json(df_info, orient='split')
+        df_info = pd.read_json(StringIO(df_info), orient='split')
         ret = [{'label': j, 'value': j} for j in df_info.columns.to_list()]
         return ret
 
@@ -618,7 +639,7 @@ def select_var2_page2(variable2_value):
     if variable2_value is None:
         raise PreventUpdate
     else:
-        print('variable2_value', variable2_value)
+        
         return variable2_value
 
 
@@ -629,7 +650,7 @@ def select_var2(df_info, variable2_value):
     if variable2_value is None:
         raise PreventUpdate
     else:
-        df_info = pd.read_json(df_info, orient='split')
+        df_info = pd.read_json(StringIO(df_info), orient='split')
         ret = [{'label': j, 'value': j} for j in df_info[str(variable2_value)].unique()]
         filtered_data = [item for item in ret if item["label"] is not None and item["value"] is not None]
         return filtered_data
@@ -639,7 +660,7 @@ def select_var2(df_info, variable2_value):
               Input('df_info', 'data'))
 def select_var3(df_info):
     if df_info is not None:
-        df_info = pd.read_json(df_info, orient='split')
+        df_info = pd.read_json(StringIO(df_info), orient='split')
         ret = [{'label': j, 'value': j} for j in df_info.columns.to_list()]
         return ret
 
@@ -651,7 +672,7 @@ def select_var1(df_info, variable3_value):
     if variable3_value is None:
         raise PreventUpdate
     else:
-        df_info = pd.read_json(df_info, orient='split')
+        df_info = pd.read_json(StringIO(df_info), orient='split')
         ret = [{'label': j, 'value': j} for j in df_info[str(variable3_value)].unique()]
         filtered_data = [item for item in ret if item["label"] is not None and item["value"] is not None]
         return filtered_data
@@ -663,7 +684,7 @@ def select_var3_page1(variable3_value):
     if variable3_value is None:
         raise PreventUpdate
     else:
-        print('variable3_value', variable3_value)
+        
         return variable3_value
 
 
@@ -711,7 +732,7 @@ def exclude_dropdown(counts_columns, counts_index, info_columns):
               PreventUpdate=True)
 def select_helper(dataset, df_info, variable1, variable2, variable3):
     if dataset != 'New':
-        df_info = pd.read_json(df_info, orient='split')
+        df_info = pd.read_json(StringIO(df_info), orient='split')
         lSamples, lExclude = load_dataset(dataset)
         lSamples = lSamples.split(' ')
         lExclude = lExclude.split(' ')
@@ -738,9 +759,9 @@ def export_plot(n_clicks, indata, prefixes):
         if indata:
 
             datasets = json.loads(indata)
-            df_degenes = pd.read_json(datasets['de_table'], orient='split')
+            df_degenes = pd.read_json(StringIO(datasets['de_table']), orient='split')
             # dTranslate = dict(df_symbol.loc[df_degenes.index]['hgnc_symbol'])
-            # print(df_degenes.index)
+            
             df_degenes['hgnc'] = [dTranslate.get(x, x) for x in df_degenes.index]
 
             # file_string = json.loads('file_string')
@@ -798,7 +819,7 @@ def select_info(lExclude, transformation, variable1_dropdown, variable2_dropdown
     # variable1 = LV RV etc
 
     if all(var is not None for var in [variable1_dropdown, variable2_dropdown, variable3_dropdown, df_info]):
-        df_info = pd.read_json(df_info, orient='split')
+        df_info = pd.read_json(StringIO(df_info), orient='split')
 
         transformation = 'None' if transformation == 'Sizefactor normalization' else transformation
 
@@ -891,7 +912,7 @@ def add_de_set(btn_add: int, btn_clear: int, de_table: List[dict],
 
     if detable_comp is not None:
         datasets2 = json.loads(detable_comp)
-        detable_comp = pd.read_json(datasets2['de_table_comp'], orient='split')
+        detable_comp = pd.read_json(StringIO(datasets2['de_table_comp']), orient='split')
 
     de_table.index = de_table['Ensembl']
     de_table = de_table.drop(['Ensembl'], axis=1)
@@ -961,8 +982,8 @@ def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_r
     else:
 
         if df_counts is not None:
-            df_counts = pd.read_json(df_counts, orient='split')
-            df_info = pd.read_json(df_info, orient='split')
+            df_counts = pd.read_json(StringIO(df_counts), orient='split')
+            df_info = pd.read_json(StringIO(df_info), orient='split')
             out_folder = os.path.join('data','generated')
             if not os.path.isdir(out_folder):
                 cmd = 'mkdir %s' % out_folder
@@ -1011,13 +1032,17 @@ def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_r
                     rm_confounding = 'None'
 
                 file_string = search_session(lSamples, transformation, rm_confounding)
+                print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
                 print(file_string, 'file_string')
+                print("before write",file_string)
+                new_run = False
 
                 if file_string is None:
+                    new_run = True
                     file_string = generate_random_string()
-                else:
                     write_session_to_file(list(df_info_temp.index), rm_confounding, transformation, file_string)
-
+                else:
+                    print(file_string, 'is not None')
                 
                 name_counts_for_pca = os.path.join('data', 'generated', f'{file_string}_counts.tab')
                 
@@ -1036,11 +1061,11 @@ def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_r
                 # Format the command to run the R script, using the constructed paths
                 cmd = f'Rscript {r_script_path} {name_counts_for_pca} {name_meta_for_pca} {rm_confounding} {name_out} {transformation}'
 
-                if not search_session(list(df_info_temp.index), rm_confounding, transformation):
-                    print(cmd)
-                    os.system(cmd)
+                if force_run:
+                        print(cmd)
+                        os.system(cmd)
                 else:
-                    if force_run:
+                    if new_run:
                         print(cmd)
                         os.system(cmd)
                     else:
@@ -1077,7 +1102,7 @@ def update_output1(indata, meta_dropdown_groupby, variable1, variable2, variable
         raise PreventUpdate
     else:
         datasets = json.loads(indata)
-        df_meta_temp = pd.read_json(datasets['meta'], orient='split')
+        df_meta_temp = pd.read_json(StringIO(datasets['meta']), orient='split')
         ltraces = []
 
         # Variable3 == batch variable
@@ -1093,6 +1118,7 @@ def update_output1(indata, meta_dropdown_groupby, variable1, variable2, variable
             'layout': go.Layout(
             )
         }
+    
 
 @app.callback(
     [Output('volcanoplot', 'figure')],
@@ -1109,7 +1135,7 @@ def generate_volcano(effects, indata, psig, xaxis, yaxis):
             psig = 0.05
 
         datasets = json.loads(indata)
-        df_volcano = pd.read_json(datasets['de_table'], orient='split')
+        df_volcano = pd.read_json(StringIO(datasets['de_table']), orient='split')
         df_volcano['-log10(p)'] = df_volcano['padj'].apply(float)
         df_volcano['pvalue'] = df_volcano['pvalue'].apply(float)
 
@@ -1141,10 +1167,11 @@ def generate_volcano(effects, indata, psig, xaxis, yaxis):
             gene='Ensembl',
             logp=logp,
             snp='hgnc',
-            title=title_,
+            #title=title_,
             xlabel=xlabel,
             highlight=highlight)
         return [dashVolcano]
+
 
 @app.callback(
     Output('biplot_text_radio', 'options'),
@@ -1153,8 +1180,14 @@ def set_biplot_options(selected):
     try:
         if selected[0] == 'biplot':
             return [{'label': k, 'value': k} for k in ['None', 'Text']]
+        else:
+            # If 'biplot' is not selected[0], return empty options
+            return []
     except IndexError:
-        # Biplot not selected
+        # Handle the case where 'selected' is empty or not as expected
+        return []
+    except Exception as e:
+        print(f"Unexpected error: {e}")
         return []
 
 @app.callback(
@@ -1205,13 +1238,12 @@ def update_output1(indata, indata_de, lgenes, input_symbol, radio_grouping, lgen
         raise PreventUpdate
     else:
         datasets = json.loads(indata)
-
-        df_meta_temp = pd.read_json(datasets['meta'], orient='split')
-        df_counts_temp = pd.read_json(datasets['counts_norm'], orient='split')
+        df_meta_temp = pd.read_json(StringIO(datasets['meta']), orient='split')
+        df_counts_temp = pd.read_json(StringIO(datasets['counts_norm']), orient='split')
         sig_gene = 0
         try:
             datasets_de = json.loads(indata_de)
-            df_degenes = pd.read_json(datasets_de['de_table'], orient='split')
+            df_degenes = pd.read_json(StringIO(datasets_de['de_table']), orient='split')
             df_degenes = df_degenes.loc[df_degenes['padj'] <= 0.05,]
             sig_gene = 1
 
@@ -1313,8 +1345,8 @@ def update_pca_and_barplot(indata, meta_dropdown_groupby, sample_names_toggle, n
         raise PreventUpdate
     else:
         datasets = json.loads(indata)
-        df_meta_temp = pd.read_json(datasets['meta'], orient='split')
-        df_counts_pca = pd.read_json(datasets['counts_norm'], orient='split')
+        df_meta_temp = pd.read_json(StringIO(datasets['meta']), orient='split')
+        df_counts_pca = pd.read_json(StringIO(datasets['counts_norm']), orient='split')
 
         if number_of_genes:
             df_counts_pca = df_counts_pca.loc[
@@ -1409,8 +1441,16 @@ def update_pca_and_barplot(indata, meta_dropdown_groupby, sample_names_toggle, n
         np.seterr(invalid='ignore')
 
         df_meta_for_corr = df_meta_temp.dropna(axis='columns')
-        correlation_matrix = df_meta_for_corr.corrwith(principalDf['PCA1'], method='pearson')
+        principalDf['PCA1'] = pd.to_numeric(principalDf['PCA1'], errors='coerce')
+        #for column in df_meta_for_corr.columns:
+        #    df_meta_for_corr[column] = pd.to_numeric(df_meta_for_corr[column], errors='coerce')
 
+        df_meta_for_corr_numeric = df_meta_for_corr.select_dtypes(include=[np.number])
+
+        #correlation_matrix = df_meta_for_corr.corrwith(principalDf['PCA1'], method='pearson')
+
+        correlation_matrix = df_meta_for_corr_numeric.corrwith(principalDf['PCA1'], method='pearson')
+        
         lPCA_data = []
         lPCA_data.append({
             'z': correlation_matrix,
@@ -1421,19 +1461,20 @@ def update_pca_and_barplot(indata, meta_dropdown_groupby, sample_names_toggle, n
             'type': 'heatmap',
         })
 
-        correlation_matrix2 = df_meta_temp.corr(method='pearson')
-        correlation_matrix2 = correlation_matrix2.fillna(0)
-        lPCA_data2 = []
-        lPCA_data2.append({
-            'z': correlation_matrix2,
-            'y': correlation_matrix2.index.tolist(),
-            'x': correlation_matrix2.columns.tolist(),
-            'reversescale': 'true',
-            'colorscale': [[0, 'white'], [1, 'blue']],
-            'type': 'heatmap',
-        })
+        #correlation_matrix2 = df_meta_temp.corr(method='pearson')
+        #correlation_matrix2 = correlation_matrix2.fillna(0)
+        #lPCA_data2 = []
+        #lPCA_data2.append({
+        #    'z': correlation_matrix2,
+        #    'y': correlation_matrix2.index.tolist(),
+        #    'x': correlation_matrix2.columns.tolist(),
+        #    'reversescale': 'true',
+        #    'colorscale': [[0, 'white'], [1, 'blue']],
+        #    'type': 'heatmap',
+        #})
 
         width_cor = correlation_matrix.shape[0] * 10
+        
         return {'data': traces,
                 'layout': go.Layout(title='Expression values', autosize=True, boxmode='group',
                                     margin={"l": 200, "b": 100, "r": 200},
@@ -1453,8 +1494,8 @@ def update_pca_and_barplot(indata, meta_dropdown_groupby, sample_names_toggle, n
                                     yaxis={"title": "Variance explained"})}, \
                {'data': lPCA_data,
                 'layout': {
-                    'height': 500,
-                    'width': 1500,
+                    'height': 100,
+                    'width': 500,
                     'xaxis': {'side': 'top'},
                     'margin': {
                         'l': 200,
@@ -1502,7 +1543,7 @@ def update_de_table(n_clicks, effects, indata, sig_value, basemean):
         else:
             datasets = json.loads(indata)
             print('update_de_table')
-            df_degenes = pd.read_json(datasets['de_table'], orient='split')
+            df_degenes = pd.read_json(StringIO(datasets['de_table']), orient='split')
             # print(df_degenes)
             radiode = datasets['DE_type']
             df_degenes = df_degenes.loc[df_degenes['padj'] <= float(sig_value),]
@@ -1543,7 +1584,7 @@ def export_de(n_clicks, indata, prefixes):
         if indata:
 
             datasets = json.loads(indata)
-            df_degenes = pd.read_json(datasets['de_table'], orient='split')
+            df_degenes = pd.read_json(StringIO(datasets['de_table']), orient='split')
             df_degenes['hgnc'] = [dTranslate.get(x, x) for x in df_degenes.index]
             file_string = datasets['file_string']
             de_file_for_plot = file_string + '_for_DEplot.tab'
@@ -1580,41 +1621,35 @@ def run_DE_analysis(n_clicks, indata, program, transformation, force_run, rowsum
         outdir = os.path.join('data','generated')
         name_counts = json.loads(datasets['counts_raw_file_name'])
         file_string = json.loads(datasets['file_string'])
-        logfile = outdir + file_string + '_DE.log'
+        logfile = os.path.join(outdir, file_string + '_DE.log')
 
         data = {
             'program': [program],
             'transformation': [transformation],
             'rowsum': [rowsum],
             'design': [design],
-            'reference': [reference]
+            'reference': [reference],
+            'ID': [file_string]
         }
         df_new = pd.DataFrame(data)
         df_new['timestamp'] = datetime.now()
-
+        print('1')
         if os.path.isfile(logfile):
             df_log = pd.read_csv(logfile)
-            df_log = df_log.append(df_new, ignore_index=True)
+            #df_log = df_log.append(df_new, ignore_index=True)
+            df_log = pd.concat([df_log, df_new], ignore_index=True)
         else:
             # if logfile does not exist, use the new dataframe
             df_log = df_new
 
         df_log.to_csv(logfile, index=False)
-
+        print('2')
         # lTotal = json.loads(datasets['prefixes'])
         # sTotal = '_'.join(lTotal)
         # file_string_program = lTotal + [program]
         # sTotalDE = sTotal + '_' + program
         name_meta = os.path.join('data', 'generated', f'{file_string}_meta.tab')
         name_out = os.path.join('data', 'generated', f'{file_string}_DE.tab')
-
-        if program == 'DESeq2':
-            r_script_path = os.path.join('functions', 'run_deseq2_v2.R')
-            cmd = f'Rscript {r_script_path} {name_counts} {name_meta} {rowsum} {design} {reference} {name_out}'
-
-        elif program == 'edgeR':
-            r_script_path = os.path.join('functions', 'run_edgeR.R')
-            cmd = f'Rscript {r_script_path} {name_counts} {name_meta} {design} {reference} {name_out}'
 
         '''
         elif program == 'limma':
@@ -1627,13 +1662,18 @@ def run_DE_analysis(n_clicks, indata, program, transformation, force_run, rowsum
                 name_counts, name_meta, 'none', reference,
                 name_out)
         '''
-
-        # else:
-        #    print('ERROR radio_de')
-
+        print('3')
         if not os.path.isfile(name_out):
-            print(cmd)
-            os.system(cmd)
+            #print(cmd)
+            #os.system(cmd)
+            if program == 'DESeq2':
+                r_script_path = os.path.join('functions', 'run_deseq2_v2.R')
+                cmd = f'Rscript {r_script_path} {name_counts} {name_meta} {rowsum} {design} {reference} {name_out}'
+
+            elif program == 'edgeR':
+                r_script_path = os.path.join('functions', 'run_edgeR.R')
+                cmd = f'Rscript {r_script_path} {name_counts} {name_meta} {design} {reference} {name_out}'
+
         else:
             if force_run:
                 print(cmd)
@@ -1654,7 +1694,7 @@ def run_DE_analysis(n_clicks, indata, program, transformation, force_run, rowsum
 
         df_degenes['hgnc'] = [dTranslate.get(x, x) for x in df_degenes.index]
         datasets = {'de_table': df_degenes.to_json(orient='split'), 'DE_type': program, 'file_string': file_string}
-
+        print('4')
         print('DE done')
         return json.dumps(datasets), 'temp', ''
 
@@ -1806,9 +1846,6 @@ def enrichr_up(n_clicks, indata, indata_de, sig_value):
                     df = pd.read_csv(fOut + '.txt', sep='\t', index_col=None)
                     df = df.sort_values(by='Adjusted P-value')
                     df_sig = len(df.loc[df['Adjusted P-value'] <= 0.05])
-
-                    print(df['Adjusted P-value'])
-                    print('### df_sig')
 
                     if df_sig > 0:
                         df_10 = df.head(df_sig)
