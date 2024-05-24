@@ -37,6 +37,12 @@ import base64
 import io
 import random
 import string
+import sys
+
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
+
 from typing import List, Tuple, Any
 from io import StringIO
 from dash import dcc
@@ -121,11 +127,6 @@ databases_enrichr = ['TRANSFAC_and_JASPAR_PWMs', 'OMIM_Disease', 'OMIM_Expanded'
                      'WikiPathways_2016', 'Panther_2016', 'GO_Biological_process_2018', 'GO_Cellular_Component_2018',
                      'GO_Molecular_Function_2018', 'Human_Phenotype_Ontology', 'MGI_Mammalian_Phenotype_2017',
                      'Jensen_DISEASES']
-
-# Create temporary df for volcanoplot init
-columns = ['Ensembl', 'hgnc', 'baseMean', 'log2FoldChange', 'pvalue', 'padj']
-data = [['ens', 'hgnc1', 10, 4, 0.005, 0.9995]]
-df = pd.DataFrame(data, columns=columns)
 
 # Layouts
 layout_index = layout_index
@@ -331,53 +332,58 @@ def serve_layout():
 app.layout = serve_layout
 
 
-def parse_contents(contents, filename, date):
-    """
-    Parses contents uploaded by the user and returns a Dash HTML Div displaying the content.
-    Handles different file types (CSV, Excel).
+def generate_example_data(type):
+    # generate type: counts or meta data
+    # Generating the RNASeq data using the negative binomial distribution
 
-    Parameters:
-    - contents (str): The contents of the uploaded file.
-    - filename (str): The name of the uploaded file.
-    - date (int): The upload timestamp.
+    number_samples = 40
+    number_genes = 25000
+    genes = ['Gene_' + str(i) for i in range(number_genes)]
 
-    Returns:
-    - dash.development.base_component.Component: A Div containing the parsed file data.
-    """
-    content_type, content_string = contents.split(',')
-    decoded = base64.b64decode(content_string)
-    try:
-        if 'csv' in filename:
-            # Assume that the user uploaded a CSV file
-            df = pd.read_csv(
-                io.StringIO(decoded.decode('utf-8')))
-        elif 'xls' in filename:
-            # Assume that the user uploaded an excel file
-            df = pd.read_excel(io.BytesIO(decoded))
-    except Exception as e:
-        print(e)
-        return html.Div([
-            'There was an error processing this file.'
-        ])
+    samples = ['SLL_' + str(i) for i in range(number_samples)]
+    
+    # Size parameter for the negative binomial distribution
+    # Parameters for the negative binomial distribution
 
-    return html.Div([
-        html.H5(filename),
-        html.H6(datetime.datetime.fromtimestamp(date)),
+    if type == 'counts':
+        mean_expression = 100  # Mean count
+        dispersion = 0.4  # Dispersion (variance/mean)
 
-        dash_table.DataTable(
-            df.to_dict('records'),
-            [{'name': i, 'id': i} for i in df.columns]
-        ),
+        # Size parameter for the negative binomial distribution using a more stable approach
+        size = mean_expression / dispersion
 
-        html.Hr(),  # horizontal line
+        # Probability of success in each experiment
+        prob = size / (size + mean_expression)
 
-        # For debugging, display the raw contents provided by the web browser
-        html.Div('Raw Content'),
-        html.Pre(contents[0:200] + '...', style={
-            'whiteSpace': 'pre-wrap',
-            'wordBreak': 'break-all'
-        })
-    ])
+        # Randomly generate the data
+
+        expression_data = np.random.negative_binomial(size, prob, size=(number_genes, number_samples))
+        df_rnaseq = pd.DataFrame(data=expression_data, index=genes, columns=samples)
+        df = df_rnaseq
+    
+        #df.to_csv('example_countdata.tab', sep='\t')
+
+        df2 = pd.read_csv('counts2.tab', sep='\t', index_col=0)
+        #print(df.head(3), df2.head(3))
+        #print(compare_dataframes(df.head(3), df2.head(3)))
+
+    else:
+        metadata = {
+            'Tissue': np.random.choice(['LV', 'RV'], size=number_samples),
+            'Disease': np.random.choice(['Disease1', 'Disease2'], size=number_samples),
+            'Batch': np.random.choice(['Batch1', 'Batch2', 'Batch3'], size=number_samples),
+            'BMI': np.random.uniform(18.5, 30.0, size=number_samples),
+            'Diabetes': np.random.choice(['Yes', 'No'], size=number_samples)
+        }
+        df_metadata = pd.DataFrame(metadata, index=samples)
+        df = df_metadata
+        #df.to_csv('example_metadata.tab', sep='\t')
+        #df = pd.read_csv('meta.tab', sep='\tab')
+        df2 = pd.read_csv('meta2.tab', sep='\t', index_col=0)
+        #print(df.head(3), df2.head(3))
+        #print(compare_dataframes(df.head(3), df2.head(3)))
+        
+    return df
 
 @app.callback(
     Output('alert_import_info', 'value'),
@@ -388,7 +394,7 @@ def parse_contents(contents, filename, date):
     Input('variable_selection1', 'value'),
     Input('variable_selection2', 'value'),
     Input('variable_selection3', 'value'))
-def update_alert_import(df_counts, df_info, var1, var2, var3):
+def update_alert_import(df_counts, df_info, var1, var2, var3):        
     if df_counts is not None and df_info is not None and var1 is None and var2 is None and var3 is None:
         df_counts = pd.read_json(StringIO(df_counts), orient='split')
         df_info = pd.read_json(StringIO(df_info), orient='split')
@@ -398,19 +404,21 @@ def update_alert_import(df_counts, df_info, var1, var2, var3):
             diff1 = [item for item in list1 if item not in list2]
             # Find elements in list2 not in list1
             diff2 = [item for item in list2 if item not in list1]
-
+            print(list(df_counts.columns))
+            print(list(df_info.index))
             return 'Columns in Count data does not match Rows in Info data \n' \
                     'Items in counts columns but not in info index: {} \n' \
                     'Items in info index but not in counts column: {}'.format(diff1, diff2), {'display': 'inline-block'}, {
                 'display': 'none'}
         else:
             return 'check', {'display': 'none'}, {'display': 'none'}
+            #return 'check', {'display': 'none'}, {'float': 'right', 'margin-right': '30px'}
 
+    #Success, show proceed button
     if df_counts is not None and df_info is not None and var1 is not None and var2 is not None and var3 is not None:
         return 'check', {'display': 'none'}, {'float': 'right', 'margin-right': '30px'}
     else:
         raise PreventUpdate
-
 
 @app.callback(Output('checkmark_counts_div', 'style'),
               Input('df_counts', 'data'))
@@ -447,28 +455,40 @@ def update_checkmark(df_counts):
               Output('counts_index_store', 'data'),
               Output('counts_columns_store', 'data'),
               Input('upload-data', 'contents'),
+              Input('generate-example-data', 'n_clicks'),
               State('upload-data', 'filename'),
               State('upload-data', 'last_modified'),)
-def update_output(contents, filename, date):
-    if contents is None:
-        raise PreventUpdate
+def update_counts_data(contents, example_data_btn, filename, date):
 
-    content_type, content_string = contents.split(',')
-    decoded = base64.b64decode(content_string)
-
-    if filename.endswith('csv'):
-        sep = ','
-    elif filename.endswith('tab'):
-        sep = '\t'
-    elif filename.endswith('tsv'):
-        sep = '\t'
+    if example_data_btn is not None:
+        df = generate_example_data('counts')
+        counts_index = list(df.index)
+        counts_columns = list(df.columns)
+        
     else:
-        return pd.DataFrame().to_json(), 'File name extension not recongized, accepted extensions are csv, tab, tsv', \
-               {'display': 'inline-block'}, [], []
+        if contents is None:
+            raise PreventUpdate
 
-    df = pd.read_csv(io.StringIO(decoded.decode('utf-8')), sep=sep, index_col=0)
-    counts_index = list(df.index)
-    counts_columns = list(df.columns)
+        content_type, content_string = contents.split(',')
+        decoded = base64.b64decode(content_string)
+
+        if filename.endswith('csv'):
+            sep = ','
+        elif filename.endswith('tab'):
+            sep = '\t'
+        elif filename.endswith('tsv'):
+            sep = '\t'
+        else:
+            return pd.DataFrame().to_json(), 'File name extension not recongized, accepted extensions are csv, tab, tsv', \
+                {'display': 'inline-block'}, [], []
+
+        df = pd.read_csv(io.StringIO(decoded.decode('utf-8')), sep=sep, index_col=0)
+        counts_index = list(df.index)
+        counts_columns = list(df.columns)
+
+    #print( counts_index,  counts_columns)
+    print(df.head(5))
+    
 
     return df.to_json(date_format='iso', orient='split'), '', {'display': 'none'}, counts_index, counts_columns
 
@@ -477,26 +497,32 @@ def update_output(contents, filename, date):
               Output('info_columns_store', 'data'),
               Output('info_index_store', 'data'),
               Input('upload-data-info', 'contents'),
+              Input('generate-example-data', 'n_clicks'),
               State('upload-data-info', 'filename'),
               State('upload-data-info', 'last_modified'))
-def update_output(contents, filename, date):
-    if contents is None:
-        raise PreventUpdate
+def update_info_data(contents, example_data_btn, filename, date):
 
-    content_type, content_string = contents.split(',')
-    decoded = base64.b64decode(content_string)
-
-    if 'csv' in filename:
-        sep = ','
-    elif 'tab' in filename:
-        sep = '\t'
-    elif 'tsv' in filename:
-        sep = '\t'
+    if example_data_btn is not None:
+        df = generate_example_data('meta_data')
     else:
-        return pd.DataFrame().to_json
+        if contents is None:
+            raise PreventUpdate
 
-    df = pd.read_csv(io.StringIO(decoded.decode('utf-8')), sep=sep, index_col=0)
+        content_type, content_string = contents.split(',')
+        decoded = base64.b64decode(content_string)
 
+        if 'csv' in filename:
+            sep = ','
+        elif 'tab' in filename:
+            sep = '\t'
+        elif 'tsv' in filename:
+            sep = '\t'
+        else:
+            return pd.DataFrame().to_json
+
+        df = pd.read_csv(io.StringIO(decoded.decode('utf-8')), sep=sep, index_col=0)
+
+    #print(df.head(5))
     return df.to_json(date_format='iso', orient='split'), list(df.columns), list(df.index)
 
 @app.callback(Output("content", "children"), [Input("tabs", "active_tab")])
@@ -600,14 +626,12 @@ def select_var1(df_info):
         ret = [{'label': j, 'value': j} for j in df_info.columns.to_list()]
         return ret
 
-
 @app.callback(Output('variable_selection1_store', 'data'),
               Input('variable_selection1', 'value'))
 def select_var1_page1(variable1_value):
     if variable1_value is None:
         raise PreventUpdate
     else:
-        
         return variable1_value
 
 
@@ -632,16 +656,13 @@ def select_var2(df_info):
         ret = [{'label': j, 'value': j} for j in df_info.columns.to_list()]
         return ret
 
-
 @app.callback(Output('variable_selection2_store', 'data'),
               Input('variable_selection2', 'value'))
 def select_var2_page2(variable2_value):
     if variable2_value is None:
         raise PreventUpdate
     else:
-        
         return variable2_value
-
 
 @app.callback(Output('variable2_selected_dropdown', 'options'),
               Input('df_info', 'data'),
@@ -655,7 +676,6 @@ def select_var2(df_info, variable2_value):
         filtered_data = [item for item in ret if item["label"] is not None and item["value"] is not None]
         return filtered_data
 
-
 @app.callback(Output('variable_selection3', 'options'),
               Input('df_info', 'data'))
 def select_var3(df_info):
@@ -663,7 +683,6 @@ def select_var3(df_info):
         df_info = pd.read_json(StringIO(df_info), orient='split')
         ret = [{'label': j, 'value': j} for j in df_info.columns.to_list()]
         return ret
-
 
 @app.callback(Output('variable3_selected_dropdown', 'options'),
               Input('df_info', 'data'),
@@ -677,7 +696,6 @@ def select_var1(df_info, variable3_value):
         filtered_data = [item for item in ret if item["label"] is not None and item["value"] is not None]
         return filtered_data
 
-
 @app.callback(Output('variable_selection3_store', 'data'),
               Input('variable_selection3', 'value'))
 def select_var3_page1(variable3_value):
@@ -687,7 +705,6 @@ def select_var3_page1(variable3_value):
         
         return variable3_value
 
-
 @app.callback(Output('varaible_selection_div', 'style'),
               Input('df_info', 'data'))
 def select_var_div(df_info):
@@ -695,7 +712,6 @@ def select_var_div(df_info):
         raise PreventUpdate
     else:
         return {'display': 'inline-block'}
-
 
 @app.callback(Output('exclude_dropdown', 'options'),
               Output('rm_confounding', 'options'),
@@ -718,7 +734,6 @@ def exclude_dropdown(counts_columns, counts_index, info_columns):
     else:
         raise PreventUpdate
 
-
 @app.callback(Output('exclude_dropdown', 'value'),
               Output('variable1_selected_dropdown', 'value'),
               Output('variable2_selected_dropdown', 'value'),
@@ -735,7 +750,12 @@ def select_helper(dataset, df_info, variable1, variable2, variable3):
         df_info = pd.read_json(StringIO(df_info), orient='split')
         lSamples, lExclude = load_dataset(dataset)
         lSamples = lSamples.split(' ')
-        lExclude = lExclude.split(' ')
+
+        if np.isnan(lExclude):
+            lExclude = []
+        else:
+            lExclude = lExclude.split(' ')
+        
         df_info_temp = df_info.loc[lSamples]
         var1_uniq = df_info_temp[variable1].unique()
         var2_uniq = df_info_temp[variable2].unique()
@@ -832,7 +852,7 @@ def select_info(lExclude, transformation, variable1_dropdown, variable2_dropdown
 
         if len(lExclude) > 0:
             # df_info_temp = df_info_temp.loc[~df_info_temp['id_tissue'].isin(lExclude), ]
-            print(lExclude)
+            #print(lExclude)
             df_info_temp = df_info_temp[~df_info_temp.index.isin(lExclude)]
 
         # df_info_temp.index = df_info_temp[[variable1, variable1]].apply(lambda x: '_'.join(x), axis=1)
@@ -846,7 +866,7 @@ def select_info(lExclude, transformation, variable1_dropdown, variable2_dropdown
                     'samples': json.dumps(df_info_temp.index.to_list()),
                     # 'full_name': json.dumps(df_info_temp['full_name'].to_list()),
                     'empty': '0'}
-
+        
         return json.dumps(datasets), ''
 
     else:
@@ -935,16 +955,15 @@ def add_de_set(btn_add: int, btn_clear: int, de_table: List[dict],
         intermediate_data = range(1, len(intermediate_data) + 1)
         intermediate_data = intermediate_data.reindex(de_table_sorted.index)
 
-    print(de_table_sorted, intermediate_data)
+    #print(de_table_sorted, intermediate_data)
 
     result = pd.concat([de_table_sorted, intermediate_data], axis=1)
-    print(result)
+    #print(result)
 
     dataset = {'de_table_comp': result.to_json(orient='split', date_format='iso')}
     data = create_de_table_comp(result, 'de_table_comp')
 
     return json.dumps(dataset), data
-
 
 background_pipe = {
     'width': '15px',
@@ -954,7 +973,6 @@ background_pipe = {
     'left': '20%',
     'position': 'relative',
 }
-
 
 ##main table: intermediate-table
 @app.callback(
@@ -980,7 +998,6 @@ def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_r
     if n_clicks == 0:
         raise PreventUpdate
     else:
-
         if df_counts is not None:
             df_counts = pd.read_json(StringIO(df_counts), orient='split')
             df_info = pd.read_json(StringIO(df_info), orient='split')
@@ -991,7 +1008,6 @@ def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_r
 
             datasets = json.loads(selected_data)
             empty = json.loads(datasets['empty'])
-
             if empty != '0':
                 var1_dropdown = json.loads(datasets[variable_selection1])
                 var2_dropdown = json.loads(datasets[variable_selection2])
@@ -999,7 +1015,6 @@ def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_r
                 exclude = json.loads(datasets['exclude'])
                 transformation = datasets['transformation']
                 lSamples = json.loads(datasets['samples'])
-
                 if len(lSamples) == 0:
 
                     df_info_temp = df_info.loc[
@@ -1015,7 +1030,7 @@ def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_r
                             if sample_excl in df_info_temp.index:
                                 df_info_temp = df_info_temp.drop(sample_excl)
                 else:
-                    print(lSamples)
+                    #print(lSamples)
                     # loading samples from datasets.txt
                     df_info_temp = df_info.loc[lSamples,]
 
@@ -1055,11 +1070,13 @@ def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_r
                 # Construct the output path for normalized data
                 name_out = os.path.join('data', 'generated', f'{file_string}_normalized.tab')
 
-                # Construct the path for the R script in a cross-platform way
-                r_script_path = os.path.join('functions', 'normalize_vsd_rlog_removebatch2.R')
+                # Construct the path for the R script
+                r_script_path = os.path.join('functions', 'data_transformation.R')
 
                 # Format the command to run the R script, using the constructed paths
                 cmd = f'Rscript {r_script_path} {name_counts_for_pca} {name_meta_for_pca} {rm_confounding} {name_out} {transformation}'
+
+                print('forcerun',force_run)
 
                 if force_run:
                         print(cmd)
@@ -1090,6 +1107,8 @@ def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_r
             raise PreventUpdate
 
 
+
+
 @app.callback(
     Output('barplot', 'figure'),
     Input('intermediate-table', 'children'),
@@ -1105,12 +1124,16 @@ def update_output1(indata, meta_dropdown_groupby, variable1, variable2, variable
         df_meta_temp = pd.read_json(StringIO(datasets['meta']), orient='split')
         ltraces = []
 
-        # Variable3 == batch variable
-
+        if meta_dropdown_groupby is None:
+            meta_dropdown_groupby = variable3
+        
+        #barplot by batch
         for x in df_meta_temp[meta_dropdown_groupby].unique():
             df_temp = df_meta_temp.loc[df_meta_temp[meta_dropdown_groupby] == x, ]
             df_temp = df_temp.groupby(variable3).count()
-            trace = go.Bar(x=df_temp.index, y=df_temp['id_tissue'], name=x)
+            print(df_temp)
+            print(df_temp.iloc[0,0])
+            trace = go.Bar(x=df_temp.index, y=df_temp.iloc[:,1], name=x)
             ltraces.append(trace)
 
         return {
@@ -1119,7 +1142,6 @@ def update_output1(indata, meta_dropdown_groupby, variable1, variable2, variable
             )
         }
     
-
 @app.callback(
     [Output('volcanoplot', 'figure')],
     [Input('volcanoplot-input', 'value'),
@@ -1197,23 +1219,27 @@ def set_biplot_options(selected):
      Input('input-2_hgnc', 'value')
      ])
 def update_hpa(lgenes, input_symbol, lgenes_hgnc):
-    if lgenes_hgnc:
-        dTranslate = dict(df_symbol_sym_ind.loc[lgenes_hgnc]['ensembl_gene_id'])
-        lgenes_hgnc = [dTranslate[x] for x in lgenes_hgnc]
-        lgenes = lgenes + lgenes_hgnc
 
-    lgenes = [x for x in lgenes if x in df_hpa.index]
-    hpa_table = df_hpa.loc[lgenes,]
+    try:
+        if lgenes_hgnc:
+            dTranslate = dict(df_symbol_sym_ind.loc[lgenes_hgnc]['ensembl_gene_id'])
+            lgenes_hgnc = [dTranslate[x] for x in lgenes_hgnc]
+            lgenes = lgenes + lgenes_hgnc
+        lgenes = [x for x in lgenes if x in df_hpa.index]
+        hpa_table = df_hpa.loc[lgenes,]
 
-    traces = []
-    if input_symbol == 'Symbol':
-        hpa_table.index = hpa_table['Gene name']
-        dTranslate = dict()
-        dTranslate = dict(df_symbol.loc[lgenes]['hgnc_symbol'])
-        lgenes = [dTranslate.get(x, x) for x in lgenes]
+        traces = []
+        if input_symbol == 'Symbol':
+            hpa_table.index = hpa_table['Gene name']
+            dTranslate = dict()
+            dTranslate = dict(df_symbol.loc[lgenes]['hgnc_symbol'])
+            lgenes = [dTranslate.get(x, x) for x in lgenes]
 
-    for gene in lgenes:
-        traces.append(go.Bar(name=gene, x=hpa_table.loc[gene,]['Tissue'], y=hpa_table.loc[gene,]['NX']))
+        for gene in lgenes:
+            traces.append(go.Bar(name=gene, x=hpa_table.loc[gene,]['Tissue'], y=hpa_table.loc[gene,]['NX']))
+
+    except:
+        traces = []
 
     return {'data': traces,
             'layout': go.Layout(title='', autosize=True, boxmode='group',
@@ -1242,23 +1268,26 @@ def update_output1(indata, indata_de, lgenes, input_symbol, radio_grouping, lgen
         df_counts_temp = pd.read_json(StringIO(datasets['counts_norm']), orient='split')
         sig_gene = 0
         try:
+            #if DE anaysis has been conducted
             datasets_de = json.loads(indata_de)
             df_degenes = pd.read_json(StringIO(datasets_de['de_table']), orient='split')
             df_degenes = df_degenes.loc[df_degenes['padj'] <= 0.05,]
             sig_gene = 1
-
         except:
             pass
 
-        dTranslate = dict()
+        try:
+            #If the counts data have Ensembl gene names
+            dTranslate = dict()
+            if lgenes_hgnc:
+                dTranslate = dict(df_symbol_sym_ind.loc[lgenes_hgnc]['ensembl_gene_id'])
+                lgenes_hgnc = [dTranslate[x] for x in lgenes_hgnc]
+                lgenes = lgenes + lgenes_hgnc
 
-        if lgenes_hgnc:
-            dTranslate = dict(df_symbol_sym_ind.loc[lgenes_hgnc]['ensembl_gene_id'])
-            lgenes_hgnc = [dTranslate[x] for x in lgenes_hgnc]
-            lgenes = lgenes + lgenes_hgnc
-
-        if input_symbol == 'Symbol':
-            dTranslate = dict(df_symbol.loc[lgenes]['hgnc_symbol'])
+            if input_symbol == 'Symbol':
+                dTranslate = dict(df_symbol.loc[lgenes]['hgnc_symbol'])
+        except:
+            pass
 
         traces = []
         lgrps = []
@@ -1273,18 +1302,6 @@ def update_output1(indata, indata_de, lgenes, input_symbol, radio_grouping, lgen
         else:
             print('error radio_grouping', radio_grouping, var1, var2, var3)
         lgrouping = df_meta_temp[cond].unique()
-
-        '''
-        if radio_grouping == 'tissue':
-            lgrouping = df_meta_temp['tissue'].unique()
-            cond = 'tissue'
-        elif radio_grouping == 'type':
-            lgrouping = df_meta_temp['type'].unique()
-            cond = 'type'
-        elif radio_grouping == 'SeqTag':
-            lgrouping = df_meta_temp['SeqTag'].unique()
-            cond = 'SeqTag'
-        '''
 
         print(lgrouping)
         for grp in lgrouping:
@@ -1332,18 +1349,23 @@ def clicked_out(clickData):
     Output('pca_comp_explained', 'figure'),
     Output('pca_correlation', 'figure'),
     Input('intermediate-table', 'children'),
-    Input('meta_dropdown_groupby', 'value'),
-    # Input('input-gene', 'value'),
     Input('sample_names_toggle', 'on'),
     Input('number_of_genes', 'value'),
     Input('biplot_radio', 'value'),
     Input('biplot_text_radio', 'value'),
-    Input('meta_dropdown', 'value'))
-def update_pca_and_barplot(indata, meta_dropdown_groupby, sample_names_toggle, number_of_genes, biplot_radio,
-                           biplot_text_radio, dropdown):
+    Input('meta_dropdown', 'value'),
+    State('variable_selection1_store', 'data'),
+    State('variable_selection3_store', 'data')
+    )
+def update_pca_and_barplot(indata, sample_names_toggle, number_of_genes, biplot_radio,
+                           biplot_text_radio, dropdown, variable1, variable3):
     if indata is None:
         raise PreventUpdate
     else:
+
+        if dropdown is None:
+            dropdown = variable1
+
         datasets = json.loads(indata)
         df_meta_temp = pd.read_json(StringIO(datasets['meta']), orient='split')
         df_counts_pca = pd.read_json(StringIO(datasets['counts_norm']), orient='split')
@@ -1416,7 +1438,10 @@ def update_pca_and_barplot(indata, meta_dropdown_groupby, sample_names_toggle, n
                 df_components = pd.DataFrame(pca.components_.T)
                 df_components.index = df_counts_pca.index
                 df_components.columns = principalDf.columns[:3]
-                dTranslate = dict(df_symbol.loc[lTop4_genes]['hgnc_symbol'])
+                try:
+                    dTranslate = dict(df_symbol.loc[lTop4_genes]['hgnc_symbol'])
+                except:
+                    pass
                 if biplot_text_radio is not None:
                     if biplot_text_radio == 'Text':
                         mode = 'text+lines'
@@ -1429,13 +1454,17 @@ def update_pca_and_barplot(indata, meta_dropdown_groupby, sample_names_toggle, n
                     x = [0, df_components.loc[gene, 'PCA1'] * 100]
                     y = [0, df_components.loc[gene, 'PCA2'] * 100]
                     z = [0, df_components.loc[gene, 'PCA3'] * 100]
-                    hgnc_name = dTranslate.get(gene, gene)
+                    try:
+                        hgnc_name = dTranslate.get(gene, gene)
 
-                    if isinstance(hgnc_name, list):
-                        hgnc_name = hgnc_name[1]
+                        if isinstance(hgnc_name, list):
+                            gene = hgnc_name[1]
+                    except:
+                        pass
+                        
 
                     ltraces3d.append(
-                        go.Scatter3d(x=x, y=y, z=z, mode=mode, marker_size=40, name=hgnc_name,
+                        go.Scatter3d(x=x, y=y, z=z, mode=mode, marker_size=40, name=gene,
                                      text=dTranslate.get(gene, gene)))
 
         np.seterr(invalid='ignore')
@@ -1564,8 +1593,11 @@ def update_de_table(n_clicks, effects, indata, sig_value, basemean):
 
             name = f"{datasets['file_string']}_{effects[0]}_{effects[1]}_de.tab"
             overlap_genes = list(set(df_degenes.index).intersection(set(df_symbol.index)))
-            dTranslate = dict(df_symbol.loc[overlap_genes]['hgnc_symbol'])
-            df_degenes['hgnc'] = [dTranslate.get(x, x) for x in df_degenes.index]
+            try:
+                dTranslate = dict(df_symbol.loc[overlap_genes]['hgnc_symbol'])
+                df_degenes['hgnc'] = [dTranslate.get(x, x) for x in df_degenes.index]
+            except:
+                pass
             output_path = os.path.join('data', 'generated', name)
             df_degenes.to_csv(output_path, sep='\t')
 
@@ -1585,7 +1617,11 @@ def export_de(n_clicks, indata, prefixes):
 
             datasets = json.loads(indata)
             df_degenes = pd.read_json(StringIO(datasets['de_table']), orient='split')
-            df_degenes['hgnc'] = [dTranslate.get(x, x) for x in df_degenes.index]
+            try:
+                df_degenes['hgnc'] = [dTranslate.get(x, x) for x in df_degenes.index]
+            except:
+                pass
+            
             file_string = datasets['file_string']
             de_file_for_plot = file_string + '_for_DEplot.tab'
             output_path = os.path.join('data', 'generated', de_file_for_plot)
@@ -1608,7 +1644,7 @@ def export_de(n_clicks, indata, prefixes):
     State('intermediate-table', 'children'),
     State('program', 'value'),
     State('transformation', 'value'),
-    State('force_run', 'on'),
+    State('force_run', 'value'),
     State('rowsum', 'value'),
     State('design', 'value'),
     State('reference', 'value'))
@@ -1616,6 +1652,7 @@ def run_DE_analysis(n_clicks, indata, program, transformation, force_run, rowsum
     if n_clicks is None:
         raise PreventUpdate
     else:
+        print('eh')
         datasets = json.loads(indata)
         # df_meta_temp = pd.read_json(datasets['meta'], orient='split')
         outdir = os.path.join('data','generated')
@@ -1662,12 +1699,12 @@ def run_DE_analysis(n_clicks, indata, program, transformation, force_run, rowsum
                 name_counts, name_meta, 'none', reference,
                 name_out)
         '''
-        print('3')
+        
         if not os.path.isfile(name_out):
             #print(cmd)
             #os.system(cmd)
             if program == 'DESeq2':
-                r_script_path = os.path.join('functions', 'run_deseq2_v2.R')
+                r_script_path = os.path.join('functions', 'run_deseq2.R')
                 cmd = f'Rscript {r_script_path} {name_counts} {name_meta} {rowsum} {design} {reference} {name_out}'
 
             elif program == 'edgeR':
@@ -1690,9 +1727,12 @@ def run_DE_analysis(n_clicks, indata, program, transformation, force_run, rowsum
         df_degenes['padj'] = df_degenes['padj'].apply(str)
         df_degenes['pvalue'] = df_degenes['pvalue'].apply(str)
         overlap_genes = list(set(df_degenes.index).intersection(set(df_symbol.index)))
-        dTranslate = dict(df_symbol.loc[overlap_genes]['hgnc_symbol'])
+        try:
+            dTranslate = dict(df_symbol.loc[overlap_genes]['hgnc_symbol'])
+            df_degenes['hgnc'] = [dTranslate.get(x, x) for x in df_degenes.index]
+        except:
+            pass
 
-        df_degenes['hgnc'] = [dTranslate.get(x, x) for x in df_degenes.index]
         datasets = {'de_table': df_degenes.to_json(orient='split'), 'DE_type': program, 'file_string': file_string}
         print('4')
         print('DE done')
@@ -1787,93 +1827,85 @@ def enrichr_up(n_clicks, indata, indata_de, sig_value):
 
         radiode = datasets['DE_type']
         file_string = datasets['file_string']
-        #
-        l_databases = ['GO_Biological_Process_2018', 'GO_Cellular_Component_2018', 'GO_Molecular_Function_2018',
-                       'KEGG_2016']
+        
+        l_databases = ['GO_Biological_Process_2018', 'GO_Cellular_Component_2018', 'GO_Molecular_Function_2018', 'KEGG_2016']
         lOutput = []
         lUpDn = ['up', 'dn']
-        out_folder = os.path.join('data','generated','enrichr')
+        out_folder = os.path.join('data', 'generated', 'enrichr')
 
         prefix = os.path.join(out_folder, file_string)
 
-        if not os.path.isdir(out_folder):
-            cmd = 'mkdir %s' % out_folder
-            os.system(cmd)
+        # Use os.makedirs to create the directory if it does not exist
+        os.makedirs(out_folder, exist_ok=True)
+        print(df_degenes)
+        print('!!!')
+        df_degenes = df_degenes[df_degenes['padj'] <= float(sig_value)]
 
-        df_degenes = df_degenes.loc[df_degenes['padj'] <= float(sig_value),]
-        # else:
-        # df_degenes = df_degenes.loc[df_degenes['pvalue'] <= float(sig_value), ]
+        df_degenes_up = df_degenes[df_degenes['log2FoldChange'] > 0]
+        df_degenes_dn = df_degenes[df_degenes['log2FoldChange'] < 0]
 
-        df_degenes_up = df_degenes.loc[df_degenes['log2FoldChange'] > 0,]
-        df_degenes_dn = df_degenes.loc[df_degenes['log2FoldChange'] < 0,]
-
-        genes_path_all = prefix + '_DE_genes.txt'
-        wf = open(genes_path_all, 'w')
-        for hgnc in df_degenes['hgnc']:
-            if not hgnc == None:
-                if isinstance(hgnc, list):
-                    hgnc = hgnc[0]
-                wf.write(hgnc + '\n')
-        wf.close()
+        genes_path_all = os.path.join(prefix + '_DE_genes.txt')
+        
+        with open(genes_path_all, 'w') as wf:
+            for hgnc in df_degenes['hgnc']:
+                if hgnc and not isinstance(hgnc, list):
+                    wf.write(hgnc + '\n')
+                elif isinstance(hgnc, list):
+                    wf.write(hgnc[0] + '\n')
 
         for db in l_databases:
             for updn in lUpDn:
-                if updn == 'up':
-                    df_degenes = df_degenes_up
-                else:
-                    df_degenes = df_degenes_dn
+                df_degenes_temp = df_degenes_up if updn == 'up' else df_degenes_dn
+                genes_path = os.path.join(prefix + '_%s_DE_genes.txt' % updn)
+                print(genes_path)
+                if len(df_degenes_temp['hgnc']) > 5:
+                    with open(genes_path, 'w') as wf:
+                        for hgnc in df_degenes_temp['hgnc']:
+                            if hgnc and not isinstance(hgnc, list):
+                                wf.write(hgnc + '\n')
+                            elif isinstance(hgnc, list):
+                                wf.write(hgnc[0] + '\n')
 
-                genes_path = prefix + '_%s_DE_genes.txt' % updn
-
-                if len(df_degenes['hgnc']) > 5:
-
-                    # if not os.path.isfile(genes_path):
-                    wf = open(genes_path, 'w')
-                    for hgnc in df_degenes['hgnc']:
-                        if not hgnc == None:
-                            if isinstance(hgnc, list):
-                                hgnc = hgnc[0]
-                            wf.write(hgnc + '\n')
-                    wf.close()
-                    fOut = prefix + '_' + updn + '_' + db
-
-                    # Dont perform the same analysis again
+                    fOut = os.path.join(prefix + '_' + updn + '_' + db)
+                    print('fOut', fOut)
+                    # Do not perform the same analysis again if file exists
                     if not os.path.isfile(fOut):
-                        cmd = 'python3 ./enrichr-api/query_enrichr_py3.py %s %s %s %s' % (
-                            genes_path, updn + '_' + db, db, fOut)
+                        python_executable = sys.executable
+                        enrichr_path = os.path.join('enrichr-api', 'query_enrichr_py3.py')
+                        cmd = f'{python_executable} {enrichr_path} {genes_path} {updn}_{db} {db} {fOut}'
                         os.system(cmd)
 
                     df = pd.read_csv(fOut + '.txt', sep='\t', index_col=None)
+
+                    if 'GO' in db:
+                        df['Term'] = df['Term'].str.replace(r' \(GO:\d+\)$', '', regex=True)
+
                     df = df.sort_values(by='Adjusted P-value')
-                    df_sig = len(df.loc[df['Adjusted P-value'] <= 0.05])
+                    df_sig = len(df[df['Adjusted P-value'] <= 0.05])
 
                     if df_sig > 0:
                         df_10 = df.head(df_sig)
                         df_10.index = df_10['Term']
-                        df_10['-log(padj)'] = df_10['Adjusted P-value'].map(lambda a: -np.log(a))
-                        df_10['Genes involved (%)'] = df_10['Overlap'].map(
+                        df_10['-log(padj)'] = df_10['Adjusted P-value'].apply(lambda a: -np.log(a))
+                        df_10['Genes involved (%)'] = df_10['Overlap'].apply(
                             lambda a: 100 * (int(a.split('/')[0]) / int(a.split('/')[1])))
                         trace = [go.Bar(x=df_10['Term'], y=df_10['Genes involved (%)'],
                                         marker={'color': df_10['Adjusted P-value'],
                                                 'colorscale': 'Magma', 'showscale': True})]
                     else:
                         trace = [go.Bar()]
-
-                    output = {'data': trace,
-                              'layout': go.Layout(title=db + '_' + updn)
-                              }
+                    output = {'data': trace, 'layout': go.Layout(title=db + '_' + updn, xaxis={'automargin': True}, height=650)}
                 else:
                     trace = [go.Bar()]
-                    output = {'data': trace,
-                              'layout': go.Layout(title=db + '_' + updn)
-                              }
+                    output = {'data': trace, 'layout': go.Layout(title=db + '_' + updn, xaxis={'automargin': True}, height=650)}
 
                 lOutput.append(output)
 
-    return lOutput[0], lOutput[1], lOutput[2], lOutput[3], lOutput[4], lOutput[5], lOutput[6], lOutput[7], ''
+        return lOutput[0], lOutput[1], lOutput[2], lOutput[3], lOutput[4], lOutput[5], lOutput[6], lOutput[7], ''
 
 if __name__ == "__main__":
     # app.run_server(debug=True, host='130.238.239.158')
     ascii_banner = pyfiglet.figlet_format("RNA analysis")
     print(ascii_banner)
-    app.run_server(debug=True, host='localhost')
+    #app.run_server(debug=True, host='localhost')
+    app.run_server(debug=True, dev_tools_ui=True, dev_tools_props_check=True)

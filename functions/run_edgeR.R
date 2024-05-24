@@ -1,127 +1,139 @@
 #DE analysis edgeR
 suppressPackageStartupMessages(library('edgeR'))
+suppressPackageStartupMessages(library('BiocParallel'))
 
-args <- commandArgs(trailingOnly = TRUE)
-indata = args[1]
-insample = args[2]
-design = args[3]
-reference = args[4]
-outfile = args[5]
+# Adjust BiocParallel based on the OS
+if (.Platform$OS.type == "windows") {
+  register(SnowParam(4))
+} else {
+  register(MulticoreParam(4))
+}
 
-options(error = function() traceback(3))
-extract_variable <- function(input_string) {
-  match <- regmatches(input_string, regexpr("(?<=\\+|~)\\w+$", input_string, perl = TRUE))
+extract_last_variable <- function(input_string) {
+  # This pattern matches variable names that consist of alphanumeric characters and underscores
+  matches <- strsplit(input_string, "[^[:alnum:]_]+")[[1]]
   
-  if (match == "") {
-    return(NULL)
+  # Filter out empty strings and the tilde
+  valid_matches <- matches[nchar(matches) > 0 & matches != "~"]
+  
+  if (length(valid_matches) == 0) {
+    stop("No variable found in the design formula.")
   } else {
-    return(match)
+    # Return the last variable component from the formula
+    return(tail(valid_matches, n = 1))
   }
 }
 
 
-extract_first_variable <- function(input_string) {
-  match <- regmatches(input_string, regexpr("(?<=~)\\w+(?=\\+)", input_string, perl = TRUE))
-  
-  if (match == "") {
-    return(NULL)
-  } else {
-    return(match)
-  }
-}
 
 run_DE <-  function (indata, insample, design, reference, outfile) {
-  insample <- read.table(insample, sep='\t', header=T)
-  rownames(insample) <- insample$id_tissue
-  insample$X <- NULL
+  #insample <- read.table(insample, sep='\t', header=T)
+  #rownames(insample) <- insample$id_tissue
+  #insample$X <- NULL
   
-  indata <- read.table(indata, sep='\t', header=T)
-  rownames(indata) <- indata$X
-  indata$X <- NULL
+  #indata <- read.table(indata, sep='\t', header=T)
+  #rownames(indata) <- indata$X
+  #indata$X <- NULL
 
-  #print(dim(indata))
-  #print( dim(insample))
-  #print(outfile)
+  if (is.character(indata)) {
+    countData <- indata <- read.table(indata, sep='\t', header=TRUE, row.names=1)
+  } else if (is.matrix(indata)) {
+    countData <- indata
+  } else {
+    stop("indata should be a matrix or a path to a CSV file containing the matrix.")
+  }
+  
+  if (is.character(insample)) {
+    insample <- read.table(insample, sep='\t', header=TRUE, row.names=1)
+  } else if (is.data.frame(insample)) {
+    insample <- insample
+  } else {
+    stop("insample should be a data frame or a path to a CSV file containing the sample information.")
+  }
+
+
   plotfolder = 'data/generated/plots/'
   prefix = strsplit(outfile,'/')[[1]][4]
   prefix = strsplit(prefix, '.tab')
-   
-  #if (intype == 'tissue'){
-  #  y1= DGEList(counts=indata, genes=rownames(indata), group = factor(insample$tissue))
-  #}else{
-  #  y1= DGEList(counts=indata, genes=rownames(indata), group = factor(insample$type))
-  #}
-
-  #de_variable <- extract_variable(design)
-  #print(design) 
-  var = extract_variable(design)
-
+  
+  var = extract_last_variable(design)
   group <- factor(insample[[var]]) 
-
-  #print(var)
-  #print(insample[[var]])
   
   y1= DGEList(counts=indata, genes=rownames(indata), group = group)
-  
-  print(dim(indata)) 
+  #print(y1)
   #Filter out genenes with low expression
-  keepRows <- rowSums(cpm(y1)>2) >= 2
-  #keepRows = rowMeans(indata) > 10
-  indata <- indata[keepRows,]
+  #keepRows <- rowSums(cpm(y1)>2) >= 2
+  #indata <- indata[keepRows,]
+  #print(paste("Total genes before filtering:", nrow(countData)))
+  keepRows <- rowSums(cpm(y1) > 1) >= 2
+  #print(paste("Genes after CPM > 1 filtering:", sum(keepRows)))
+  
+  # Adjust filtering here if needed based on the results of print statements
+  if (sum(keepRows) == 0) {
+    warning("No genes pass the filtering criteria. Adjust the filter or check data quality.")
+    return(NULL)
+  }
+  
   y1 <- y1[keepRows, , keep.lib.sizes=FALSE]
   y1 <- calcNormFactors(y1)
   #y1 = estimateCommonDisp(y1, verbose=TRUE)
   
   if(!dir.exists(plotfolder)) {
-    dir.create(plotfolder)
+    dir.create(plotfolder, recursive = TRUE)
   }
 
-  pdf(paste(plotfolder, prefix,'_MDS.pdf', sep=''))
+
+  pdf(paste0(plotfolder, prefix, '_MDS.pdf'))
   plotMDS(y1)
   dev.off()
   
-  #print(y1)
-
-  #print(y1$samples)
-  #group <- factor(insample$tissue)
-  
-  #design <- model.matrix(~group)
-
-  #print(
   design <- model.matrix(as.formula(design), data=insample)
-  
   
   #print(design)
   y1 <- estimateGLMCommonDisp(y1, design=design)
+  print(paste("Genes after common dispersion:", nrow(y1$counts)))
   y1 <- estimateGLMTrendedDisp(y1, design=design)
   y1 <- estimateGLMTagwiseDisp(y1, design=design)
   y1 <- estimateDisp(y1, design=design, robust=TRUE)
-  y1 <- estimateGLMCommonDisp(y1, design=design) 
-  pdf(paste(plotfolder, prefix, '_BCV.pdf', sep=''))
+  #y1 <- estimateGLMCommonDisp(y1, design=design) 
+
+
+  pdf(paste0(plotfolder, prefix, '_BCV.pdf'))
   plotBCV(y1)
   dev.off()
   
   fit <- glmFit(y1, design)
   lrt <- glmLRT(fit)
-  #qlf <- glmQLFTest(fit)
-  toptags <- topTags(lrt, n=length(rownames(indata)))
-  degenes <- toptags$table
-  #Quasi
-  #degenes <- qlf$table
-  pdf(paste(plotfolder,prefix,'_DEs.pdf', sep=''))
-  deGenes <- decideTestsDGE(lrt, p=0.05)
-  deGenes <- rownames(lrt)[as.logical(deGenes)]
-  plotSmear(lrt, de.tags=deGenes)
-  abline(h=c(-1, 1), col=2)
-  
-  dev.off()
+
+  print(lrt$table)
+  # Check if there are genes left to output
+  if (nrow(lrt$table) > 0) {
+    toptags <- topTags(lrt, n = Inf)  # Retrieve all rows
+    degenes <- toptags$table
     
-  write.table(degenes, outfile, sep='\t', quote = F)
+    pdf(paste0(plotfolder, prefix, '_DEs.pdf'))
+    deGenes <- decideTests(lrt, p=0.05)
+    deGenes <- rownames(lrt)[as.logical(deGenes)]
+    
+    write.table(degenes, outfile, sep='\t', quote = FALSE)
+  } else {
+    warning("No genes available after filtering to perform DE analysis. Check filtering criteria or data variability.")
+  }
+
+  #qlf <- glmQLFTest(fit)
+  #print(lrt)
 }
 
+if (!interactive()) {
 
-#indata = './data/generated/SLL62_LV_SLL64_RV_SLL53_RV_LV_RV_@P11701_@HWI-D0048_Normal_HFPEF_HFrEF_edgeR_counts.tab'
-##insample = './data/generated/SLL62_LV_SLL64_RV_SLL53_RV_LV_RV_@P11701_@HWI-D0048_Normal_HFPEF_HFrEF_edgeR_meta.tab'
-#batch = 'batch'
-#outfile = 'test'
-run_DE(indata, insample, design, reference, outfile)
+  args <- commandArgs(trailingOnly = TRUE)
+  indata = args[1]
+  insample = args[2]
+  design = args[3]
+  reference = args[4]
+  outfile = args[5]
+
+  run_DE(indata, insample, design, reference, outfile)
+  #options(error = function() traceback(3))
+}
+

@@ -1,3 +1,7 @@
 data/generated/*
 data/scripts/*
 data/datasets/*
+test/data/*
+test/_snaps/*
+./counts*
+./meta*

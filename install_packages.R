@@ -4,4 +4,4 @@ if (!require("BiocManager", quietly = TRUE))
 BiocManager::install(version = "3.19")
 
 
-BiocManager::install(c("DESeq2", "edgeR", 'limma', 'statmod', 'ggplot2', 'dplyr'))
+BiocManager::install(c("DESeq2", "edgeR", 'limma', 'statmod', 'ggplot2', 'dplyr', 'qsmooth'))

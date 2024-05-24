@@ -1,8 +1,14 @@
 # Load necessary libraries
 suppressPackageStartupMessages(library('DESeq2'))
 library("BiocParallel")
-register(MulticoreParam(4))
 library("matrixStats")
+print('d2_v2')
+# Adjust BiocParallel based on the OS
+if (.Platform$OS.type == "windows") {
+  register(SnowParam(4))
+} else {
+  register(MulticoreParam(4))
+}
 
 # Function to extract the first variable from the design formula
 extract_first_variable <- function(input_string) {
@@ -53,14 +59,17 @@ run_DE <- function(indata, insample, rowm, design, outfile, reference) {
   dev.off()
 }
 
-# Parse command-line arguments
-args <- commandArgs(trailingOnly = TRUE)
-indata <- args[1]
-insample <- args[2]
-rowm <- as.numeric(args[3])
-design <- args[4]
-reference <- args[5]
-outfile <- args[6]
 
-# Run DESeq2 analysis
-run_DE(indata, insample, rowm, design, outfile, reference)
+if (!interactive()) {
+  # Parse command-line arguments
+  args <- commandArgs(trailingOnly = TRUE)
+  indata <- args[1]
+  insample <- args[2]
+  rowm <- as.numeric(args[3])
+  design <- args[4]
+  reference <- args[5]
+  outfile <- args[6]
+
+  # Run DESeq2 analysis
+  run_DE(indata, insample, rowm, design, outfile, reference)
+}
