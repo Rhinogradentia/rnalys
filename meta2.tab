@@ -1,9 +1,0 @@
-	id_tissue	>=Q30	Gender	KS	Mreads	NGI ID	Patients.id	Samples	SeqBatch	SeqTag	Status	Tag	Type_symbol	Typical	Unnamed: 0	User ID	full_id	id_tissue.1	id_tissue_type	id_type	sll_id	sll_number	tissue	tissue_sv	type
-SLL10_LV	SLL10_LV		M				SLL10	SLL10_LV_Normal	To_Bengt_from_Michaela	@NS500688		LVRAA-	N	1				SLL10_LV		SLL10_Normal			LV		Normal
-SLL10_RAA	SLL10_RAA		M				SLL10	SLL10_RAA_Normal	From_Michaela_Asp	@NS500688		LVRAA-	N	1				SLL10_RAA		SLL10_Normal			RAA		Normal
-SLL13_LV	SLL13_LV		M				SLL13	SLL13_LV_Normal	to_BP_from_MA	@NS500688		LVRAA-	N	0				SLL13_LV		SLL13_Normal			LV		Normal
-SLL13_RAA	SLL13_RAA		M				SLL13	SLL13_RAA_Normal	From_Michaela_Asp	@NS500688		LVRAA-	N	0				SLL13_RAA		SLL13_Normal			RAA		Normal
-SLL18_LV	SLL18_LV		M				SLL18	SLL18_LV_Normal	To_Bengt_from_Michaela	@NS500688		LVRAARV	N	0				SLL18_LV		SLL18_Normal			LV		Normal
-SLL18_RAA	SLL18_RAA		M				SLL18	SLL18_RAA_Normal	From_Michaela_Asp	@NS500688		LVRAARV	N	0				SLL18_RAA		SLL18_Normal			RAA		Normal
-SLL18_RV	SLL18_RV		M				SLL18	SLL18_RV_Normal	160628_PREFERS	@HWI-D0048		LVRAARV	N	0				SLL18_RV		SLL18_Normal			RV		Normal
-SLL20_LV	SLL20_LV		M				SLL20	SLL20_LV_Normal	to_BP_from_MA	@NS500688		LVRAA-	N	0				SLL20_LV		SLL20_Normal			LV		Normal
