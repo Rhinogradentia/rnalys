@@ -433,10 +433,10 @@ layout_page1 = html.Div(
 
             #dcc.Graph(id='indicator-graphic2'),
             #dcc.Graph(id='hpa_graph'),
-            dash_table.DataTable(id='gene_table',
-                                 columns=[
-                                     {"name": i, "id": i} for i in sorted(df_symbol.columns)
-                                 ]),
+            #dash_table.DataTable(id='gene_table',
+            #                     columns=[
+            #                         {"name": i, "id": i} for i in sorted(df_symbol.columns)
+            #                     ]),
 
         ],  className='row', style={'z-index': '2','position':'relative', 'backgroundColor':'white', 'display': 'flex', 'margin-left': '5px', 'margin-right':'5px', 'border': '1px solid #C6CCD5', 'padding': '20px', 'border-radius': '5px','justify-content': 'space-between'}),
 
@@ -454,7 +454,7 @@ layout_page1 = html.Div(
         ),
 
         html.Div([
-            html.Div([html.H2('PCA analysis')], style={"textAlign": "left", 'margin-top': 10, 'margin-left': 10}),
+            html.Div([html.H2('PC Analysis')], style={"textAlign": "left", 'margin-top': 10, 'margin-left': 10}),
 
 
             #dbc.Input(id='input-gene', type='text', placeholder='Insert Gene (Ensembl)'),
@@ -588,7 +588,7 @@ layout_page1 = html.Div(
             html.Div([
                 html.H3('DE analysis'),
                  # Main container for side-by-side layout
-    html.Div([
+        html.Div([
         # Left side container
         html.Div([
             # Contains all left side input controls and buttons
@@ -669,37 +669,55 @@ layout_page1 = html.Div(
                 dbc.Spinner(html.Div(id="submit-de-done"), size='md', delay_hide=1, delay_show=1,
                             show_initially=False, color="primary"),
             ], style={'width': '100%', 'padding': '5px', 'display': 'flex', 'flex-direction': 'row', 'align-items': 'center'})
-        ], style={'width': '50%', 'display': 'inline-block', 'padding': '10px'}),
+        ], style={'width': '30%', 'display': 'inline-block', 'padding': '10px'}),
 
         # Right side container
-        html.Div([
-            # Slider
-            html.Div(
-                dcc.RangeSlider(
-                    id='volcanoplot-input',
-                    min=-8,
-                    max=8,
-                    step=0.05,
-                    marks={i: {'label': str(i)} for i in range(-8, 9)},
-                    value=[-1, 1]
-                ),
-                style={'width': '100%', 'margin': 'auto', 'padding': '20px'}
-            ),
+        
 
-            # Graph
-            html.Div(
-                dcc.Graph(
-                    id='volcanoplot',
-                    figure=dashbio.VolcanoPlot(effect_size='log2FoldChange', p='padj', gene='Ensembl',
-                                               logp=True, snp='Ensembl', xlabel='log2FoldChange',
-                                               genomewideline_value=2.5, dataframe=df_volcano
+        html.Div([
+        dcc.Tabs([
+            dcc.Tab(label='Volcano Plot', children=[
+                html.Div([
+                    html.Div(
+                        dcc.RangeSlider(
+                            id='volcanoplot-input',
+                            min=-8,
+                            max=8,
+                            step=0.05,
+                            marks={i: {'label': str(i)} for i in range(-8, 9)},
+                            value=[-1, 1]
+                        ),
+                        style={'width': '100%', 'margin': 'auto', 'padding': '20px'}
                     ),
-                    style={'height': '650px', 'width':'600'}
-                ),
-                style={'width': '100%', 'margin': 'auto'}
-            )
-        ], style={'width': '100%', 'display': 'inline-block', 'verticalAlign': "top", 'padding': '10px'})
-            ], style={'display': 'flex', 'width': '100%'}),
+                html.Div(
+                    dcc.Graph(
+                        id='volcanoplot',
+                        figure=dashbio.VolcanoPlot(
+                            effect_size='log2FoldChange', 
+                            p='padj', 
+                            gene='Ensembl',
+                            logp=True, 
+                            snp='Ensembl', 
+                            xlabel='log2FoldChange',
+                            genomewideline_value=2.5, 
+                            dataframe=df_volcano
+                        ),
+                        style={'height': '600px', 'width': '800px'}  # width was adjusted to match height syntax
+                    ),
+                    style={'width': '100%', 'margin': 'auto'}
+                )
+            ], style={'width': '100%', 'display': 'inline-block', 'verticalAlign': "top", 'padding': '10px'})
+        ]),
+
+           dbc.Tab(
+                    dcc.Graph(id='ma_plot', style={'width': '100%', 'margin': 'auto', 'height': '600px', 'width': '800px'}),
+                                label="MA-plot"
+                            ),
+                
+            ], )#style={'height': '10px'})
+        ], style={'width': '70%', 'display': 'inline-block', 'padding': '10px'})
+         
+        ], style={'display': 'flex', 'width': '100%'}),
 
             html.Br(),
             html.P(id='export_placeholder'),
@@ -896,7 +914,7 @@ layout_index = html.Div(
                             html.Div(id='checkmark_counts_div',
                                 children=[
                                     # Assuming you have a function `b64_image` to convert image path to base64 string
-                                    # html.Img(src=b64_image('assets/checkmark.jpg'), height='60', width='60'),
+                                    html.Img(src=b64_image('assets/checkmark.jpg'), height='60', width='60'),
                                 ], style={'display':'none'})
                         ], style={'display': 'flex',  'width': '100%'}),
 
@@ -943,10 +961,19 @@ layout_index = html.Div(
                             ),
                             html.Div(id='checkmark_info_div',
                                      children=[
-                                         # html.Img(src=b64_image('assets/checkmark.jpg'), height='60', width='60'),
+                                         html.Img(src=b64_image('assets/checkmark.jpg'), height='60', width='60'),
                                      ], style={'display': 'none'})
 
                         ], style={'display': 'flex',  'width': '100%'}),
+
+                        html.Div(id='alert_import_info_div2', children=[
+                            dbc.Alert(
+                                "Import error",
+                                id="alert_import_info_2",
+                                color='info',
+                                dismissable=True,
+                            ),
+                        ], style={'display':'none'}),
 
                     ], style={'display': 'flex', 'width': '100%', 'align-items': 'center'}),
 
@@ -982,9 +1009,9 @@ layout_index = html.Div(
 
                     html.Div([
                         html.Div(id='page_proceed', children=[
-                            dbc.Button('Proceed', href='/page-1'),
+                            dbc.Button('Proceed', color='success', href='/page-1'),
                         ], style={'display':'none'})
-                    ], style={'text-align': 'right', 'width': '50%', 'display': 'inline-block', 'margin-top':'50px'}),
+                    ], style={'text-align': 'right', 'width': '93%', 'display': 'inline-block', 'margin-top':'50px'}),
 
                 ], style={'display':'block', 'width': '50%', 'padding-left': '10px'}),
 

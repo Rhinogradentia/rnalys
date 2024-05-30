@@ -38,8 +38,9 @@ import io
 import random
 import string
 import sys
-
+import subprocess
 import logging
+import plotly.express as px
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -62,8 +63,6 @@ FONT_AWESOME = "https://use.fontawesome.com/releases/v5.10.2/css/all.css"
 
 app = dash.Dash(
     __name__,
-    # external_stylesheets=['https://codepen.io/chriddyp/pen/bWLwgP.css', dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP],
-    # external_stylesheets=['https://codepen.io/chriddyp/pen/bWLwgP.css'],
     external_stylesheets=[dbc.themes.LITERA, FONT_AWESOME],
     suppress_callback_exceptions=True
 )
@@ -73,9 +72,6 @@ Initializes the Dash app with specific external stylesheets.
 - FONT_AWESOME: Font Awesome for icons.
 suppress_callback_exceptions is set to True for handling exceptions in callbacks.
 """
-
-#df meta : df_meta_v3.tab
-#df counts: df_counts_combined.tab
 
 url_bar_and_content_div = html.Div([
     dcc.Location(id='url', refresh=False),
@@ -257,47 +253,25 @@ def search_session(sample_string, transformation, rm_confounding):
 
     df = pd.read_csv(session_file_path)
 
-    # Check if the given values match those in the DataFrame
-    print(rm_confounding)
-    print(' '.join(sample_string))
-    print(transformation)
-
     matching_rows = df[
         (df['Sample Names'] == ' '.join(sample_string)) &
         (df['rm_confounding'] == rm_confounding) &
         (df['Transformation'] == transformation)
         ]
 
-    # Fill NaN values in 'rm_confounding' with 0
     df['rm_confounding'] = df['rm_confounding'].fillna('0')
-
-
-    # Adjust rm_confounding parameter: treat None as 0
     rm_confounding = '0' if rm_confounding == 'None' else rm_confounding
-
-    
-    # Condition 1: Match 'Sample Names'
     condition_1 = df['Sample Names'] == ' '.join(sample_string)
-
-    # Condition 2: Match 'rm_confounding', directly comparing after NaN replacement
     condition_2 = df['rm_confounding'] == rm_confounding
-
-    # Condition 2: Match 'rm_confounding', directly comparing after NaN replacement
-    # Ensure the DataFrame column is the same type as the comparison value
     df['rm_confounding'] = df['rm_confounding'].astype(type(rm_confounding))
     condition_2 = df['rm_confounding'] == rm_confounding
-   
-    # Condition 3: Match 'Transformation', case-insensitive
     condition_3 = df['Transformation'].str.lower() == transformation.lower()
-    # Combine conditions to filter rows
+
     matching_rows = df[condition_1 & condition_2 & condition_3]
-    
-    # If there are any matching rows, return the File String value(s)
     if not matching_rows.empty:
         file_string_return = matching_rows['file_string'].tolist()[0]
         return file_string_return
     
-    # If there are no matching rows, return None
     return None
 
 
@@ -340,49 +314,58 @@ def generate_example_data(type):
     number_genes = 25000
     genes = ['Gene_' + str(i) for i in range(number_genes)]
 
+    # Creating fixed sample IDs, with first half LV and second half RV
     samples = ['SLL_' + str(i) for i in range(number_samples)]
-    
-    # Size parameter for the negative binomial distribution
-    # Parameters for the negative binomial distribution
+    tissues = ['LV'] * (number_samples // 2) + ['RV'] * (number_samples // 2)
 
-    if type == 'counts':
-        mean_expression = 100  # Mean count
-        dispersion = 0.4  # Dispersion (variance/mean)
+    # Parameters for the negative binomial distribution differ by tissue type
+    mean_expression_LV = 100  # Mean count for LV
+    mean_expression_RV = 120  # Mean count for RV, different from LV to simulate variability
+    dispersion_LV = 0.4  # Dispersion for LV
+    dispersion_RV = 0.6  # Dispersion for RV, can be different to simulate biological variability
 
-        # Size parameter for the negative binomial distribution using a more stable approach
+    # Initialize the dataframe to store the expression data
+    expression_data = np.zeros((number_genes, number_samples))
+
+    # Generate data for each tissue type
+    for i, tissue in enumerate(tissues):
+        if tissue == 'LV':
+            mean_expression = mean_expression_LV
+            dispersion = dispersion_LV
+        else:
+            mean_expression = mean_expression_RV
+            dispersion = dispersion_RV
+
         size = mean_expression / dispersion
-
-        # Probability of success in each experiment
         prob = size / (size + mean_expression)
+        expression_data[:, i] = np.random.negative_binomial(size, prob, size=number_genes)
 
-        # Randomly generate the data
+    df_rnaseq = pd.DataFrame(data=expression_data, index=genes, columns=samples)
+    # Select 10% of the genes to have even more exaggerated differences
+    num_differential_genes = int(0.1 * number_genes)
+    differential_gene_indices = np.random.choice(number_genes, num_differential_genes, replace=False)
 
-        expression_data = np.random.negative_binomial(size, prob, size=(number_genes, number_samples))
-        df_rnaseq = pd.DataFrame(data=expression_data, index=genes, columns=samples)
-        df = df_rnaseq
-    
-        #df.to_csv('example_countdata.tab', sep='\t')
+    # Adjust parameters for these genes
+    for index in differential_gene_indices:
+        expression_data[index, :number_samples//2] = np.random.negative_binomial(mean_expression_LV * 2, prob, size=number_samples//2)  # Double the LV mean for these genes
+        expression_data[index, number_samples//2:] = np.random.negative_binomial(mean_expression_RV * 2, prob, size=number_samples//2)  # Double the RV mean for these genes
 
-        df2 = pd.read_csv('counts2.tab', sep='\t', index_col=0)
-        #print(df.head(3), df2.head(3))
-        #print(compare_dataframes(df.head(3), df2.head(3)))
 
-    else:
-        metadata = {
-            'Tissue': np.random.choice(['LV', 'RV'], size=number_samples),
-            'Disease': np.random.choice(['Disease1', 'Disease2'], size=number_samples),
-            'Batch': np.random.choice(['Batch1', 'Batch2', 'Batch3'], size=number_samples),
-            'BMI': np.random.uniform(18.5, 30.0, size=number_samples),
-            'Diabetes': np.random.choice(['Yes', 'No'], size=number_samples)
-        }
-        df_metadata = pd.DataFrame(metadata, index=samples)
-        df = df_metadata
-        #df.to_csv('example_metadata.tab', sep='\t')
-        #df = pd.read_csv('meta.tab', sep='\tab')
-        df2 = pd.read_csv('meta2.tab', sep='\t', index_col=0)
-        #print(df.head(3), df2.head(3))
-        #print(compare_dataframes(df.head(3), df2.head(3)))
+    # Metadata DataFrame creation
+    metadata = {
+        'Tissue': tissues,
+        'Disease': np.random.choice(['Disease1', 'Disease2'], size=number_samples),
+        'Batch': np.random.choice(['Batch1', 'Batch2', 'Batch3'], size=number_samples),
+        'BMI': np.random.uniform(18.5, 30.0, size=number_samples),
+        'Diabetes': np.random.choice(['Yes', 'No'], size=number_samples)
+    }
+    df_metadata = pd.DataFrame(metadata, index=samples)
         
+    if type == 'counts':
+        df = df_rnaseq
+    else:
+        df = df_metadata
+
     return df
 
 @app.callback(
@@ -404,19 +387,17 @@ def update_alert_import(df_counts, df_info, var1, var2, var3):
             diff1 = [item for item in list1 if item not in list2]
             # Find elements in list2 not in list1
             diff2 = [item for item in list2 if item not in list1]
-            print(list(df_counts.columns))
-            print(list(df_info.index))
+            
             return 'Columns in Count data does not match Rows in Info data \n' \
                     'Items in counts columns but not in info index: {} \n' \
                     'Items in info index but not in counts column: {}'.format(diff1, diff2), {'display': 'inline-block'}, {
                 'display': 'none'}
         else:
             return 'check', {'display': 'none'}, {'display': 'none'}
-            #return 'check', {'display': 'none'}, {'float': 'right', 'margin-right': '30px'}
 
     #Success, show proceed button
     if df_counts is not None and df_info is not None and var1 is not None and var2 is not None and var3 is not None:
-        return 'check', {'display': 'none'}, {'float': 'right', 'margin-right': '30px'}
+        return 'check', {'display': 'none'}, {'display': 'inline-block', 'margin-right': '1px'}
     else:
         raise PreventUpdate
 
@@ -426,14 +407,12 @@ def update_checkmark(df_counts):
     if df_counts is None:
         raise PreventUpdate
     else:
-        #return {'display': 'inline-block', 'position': 'relative', 'top': '0px', 'left': '5px'}
         return {'display': 'flex', 'alignItems': 'center', 'justifyContent': 'right'}
 
 @app.callback(
     Output("alert-dismiss", "hide"),
     Input("alert-button", "n_clicks"),
     State("alert-dismiss", "hide"),
-    #prevent_initial_call=True,
 )
 def alert(n_clicks, hide):
     if n_clicks is None:
@@ -446,7 +425,6 @@ def update_checkmark(df_counts):
     if df_counts is None:
         raise PreventUpdate
     else:
-        #return {'display': 'flex', 'position': 'relative', 'top': '10px', 'left': '10px'}
         return {'display': 'flex', 'alignItems': 'center', 'justifyContent': 'right'}
 
 @app.callback(Output('df_counts', 'data'),
@@ -486,16 +464,13 @@ def update_counts_data(contents, example_data_btn, filename, date):
         counts_index = list(df.index)
         counts_columns = list(df.columns)
 
-    #print( counts_index,  counts_columns)
-    print(df.head(5))
-    
-
     return df.to_json(date_format='iso', orient='split'), '', {'display': 'none'}, counts_index, counts_columns
 
 
 @app.callback(Output('df_info', 'data'),
               Output('info_columns_store', 'data'),
               Output('info_index_store', 'data'),
+              Output('alert_import_info_div2', 'style'),
               Input('upload-data-info', 'contents'),
               Input('generate-example-data', 'n_clicks'),
               State('upload-data-info', 'filename'),
@@ -507,23 +482,20 @@ def update_info_data(contents, example_data_btn, filename, date):
     else:
         if contents is None:
             raise PreventUpdate
-
+        print('1')
         content_type, content_string = contents.split(',')
         decoded = base64.b64decode(content_string)
-
+        print('2')
         if 'csv' in filename:
             sep = ','
-        elif 'tab' in filename:
-            sep = '\t'
-        elif 'tsv' in filename:
+        elif 'tab' in filename or 'tsv' in filename:
             sep = '\t'
         else:
-            return pd.DataFrame().to_json
-
+            return pd.DataFrame().to_json(), [], [], {'display': 'inline-block'}
+        print('3')
         df = pd.read_csv(io.StringIO(decoded.decode('utf-8')), sep=sep, index_col=0)
 
-    #print(df.head(5))
-    return df.to_json(date_format='iso', orient='split'), list(df.columns), list(df.index)
+    return df.to_json(date_format='iso', orient='split'), list(df.columns), list(df.index), {'display': 'none'}
 
 @app.callback(Output("content", "children"), [Input("tabs", "active_tab")])
 def switch_tab(at):
@@ -569,9 +541,6 @@ def save_dataset(n_clicks, selected_data, dataset_name, lExclude):
     datasets = json.loads(selected_data)
     lSamples = json.loads(datasets['samples'])
     dataset_name = dataset_name
-    # print([dataset_name, ' '.join(lSamples)])
-    # save_dataset_to_file([dataset_name, ' '.join(lSamples)])
-    # write_sample_names_to_file(lSamples, 'test')
     write_dataset(lSamples, lExclude, id_name=dataset_name)
 
 
@@ -587,9 +556,8 @@ def display_page(pathname):
 
 
 def table_type(df_column):
-    # Note - this only works with Pandas >= 1.0.0
 
-    if sys.version_info < (3, 0):  # Pandas 1.0.0 does not support Python 2
+    if sys.version_info < (3, 0):
         return 'any'
     if isinstance(df_column.dtype, pd.DatetimeTZDtype):
         return 'datetime',
@@ -617,7 +585,7 @@ def exclude_helper(exclude, verbose=0):
         print(exclude)
     return [json.dumps(exclude)]
 
-
+#Populate the variable_selection on the index page
 @app.callback(Output('variable_selection1', 'options'),
               Input('df_info', 'data'))
 def select_var1(df_info):
@@ -643,6 +611,7 @@ def select_var1(df_info, variable1_value):
         raise PreventUpdate
     else:
         df_info = pd.read_json(StringIO(df_info), orient='split')
+        print(df_info)
         ret = [{'label': j, 'value': j} for j in df_info[str(variable1_value)].unique()]
         filtered_data = [item for item in ret if item["label"] is not None and item["value"] is not None]
         return filtered_data
@@ -702,7 +671,6 @@ def select_var3_page1(variable3_value):
     if variable3_value is None:
         raise PreventUpdate
     else:
-        
         return variable3_value
 
 @app.callback(Output('varaible_selection_div', 'style'),
@@ -718,8 +686,6 @@ def select_var_div(df_info):
               Output('meta_dropdown', 'options'),
               Output('gene_list', 'options'),
               Output('meta_dropdown_groupby', 'options'),
-              # Input('df_counts', 'data'),
-              # Input('df_info', 'data'))
               Input('counts_columns_store', 'data'),
               Input('counts_index_store', 'data'),
               Input('info_columns_store', 'data'))
@@ -739,7 +705,6 @@ def exclude_dropdown(counts_columns, counts_index, info_columns):
               Output('variable2_selected_dropdown', 'value'),
               Output('variable3_selected_dropdown', 'value'),
               Input('datasets', 'value'),
-              # State('exclude_list', 'children'),
               State('df_info', 'data'),
               State('variable_selection1_store', 'data'),
               State('variable_selection2_store', 'data'),
@@ -751,10 +716,10 @@ def select_helper(dataset, df_info, variable1, variable2, variable3):
         lSamples, lExclude = load_dataset(dataset)
         lSamples = lSamples.split(' ')
 
-        if np.isnan(lExclude):
+        if pd.isna(lExclude):
             lExclude = []
         else:
-            lExclude = lExclude.split(' ')
+            lExclude = lExclude.split(' ') if isinstance(lExclude, str) else []
         
         df_info_temp = df_info.loc[lSamples]
         var1_uniq = df_info_temp[variable1].unique()
@@ -777,26 +742,16 @@ def export_plot(n_clicks, indata, prefixes):
         raise PreventUpdate
     else:
         if indata:
-
             datasets = json.loads(indata)
-            df_degenes = pd.read_json(StringIO(datasets['de_table']), orient='split')
-            # dTranslate = dict(df_symbol.loc[df_degenes.index]['hgnc_symbol'])
-            
+            df_degenes = pd.read_json(StringIO(datasets['de_table']), orient='split')            
             df_degenes['hgnc'] = [dTranslate.get(x, x) for x in df_degenes.index]
-
-            # file_string = json.loads('file_string')
             file_string = datasets['file_string']
-            # prefixes = json.loads(prefixes)
-            # lTotal = json.loads(prefixes['prefixes'])
-            # sTotal = '_'.join(lTotal)
-            # sTotal = sTotal + '_for_DEplot.tab'
 
             outdir = os.path.join('data', 'generated')
             de_file_for_plot = file_string + '_for_DEplot.tab'
             de_file_for_plot_path = os.path.join(outdir, de_file_for_plot)
 
             df_degenes.to_csv(de_file_for_plot_path, sep='\t')
-            #volcano_file = file_string + '_volcano.R'
             volcano_file = file_string + '_volcano.R'
             volcano_file_path = os.path.join('data', 'scripts', volcano_file)
             volcano_template_path = os.path.join('data', 'templates', 'volcano_template.R')
@@ -806,7 +761,6 @@ def export_plot(n_clicks, indata, prefixes):
                 filedata = file.read()
 
             # Replace the target string
-            #filedata = filedata.replace('infile_holder', de_file_for_plot_path)
             filedata = filedata.replace('infile_holder', de_file_for_plot_path)
             
             # Write the file out again
@@ -847,16 +801,8 @@ def select_info(lExclude, transformation, variable1_dropdown, variable2_dropdown
         df_info_temp = df_info_temp.loc[df_info_temp[variable2].isin(variable2_dropdown), ]
         df_info_temp = df_info_temp.loc[df_info_temp[variable3].isin(variable3_dropdown), ]
 
-        # lExclude = lExclude.split()
-        # print(lExclude)
-
         if len(lExclude) > 0:
-            # df_info_temp = df_info_temp.loc[~df_info_temp['id_tissue'].isin(lExclude), ]
-            #print(lExclude)
             df_info_temp = df_info_temp[~df_info_temp.index.isin(lExclude)]
-
-        # df_info_temp.index = df_info_temp[[variable1, variable1]].apply(lambda x: '_'.join(x), axis=1)
-        # df_info_temp['full_name'] = [x+'_'+df_info_temp.loc[x, variable1] for x in df_info_temp.index]
 
         datasets = {variable1: json.dumps(df_info_temp[variable1].unique().tolist()),
                     'transformation': transformation,
@@ -864,7 +810,6 @@ def select_info(lExclude, transformation, variable1_dropdown, variable2_dropdown
                     variable3: json.dumps(df_info_temp[variable3].unique().tolist()),
                     'exclude': json.dumps(lExclude),
                     'samples': json.dumps(df_info_temp.index.to_list()),
-                    # 'full_name': json.dumps(df_info_temp['full_name'].to_list()),
                     'empty': '0'}
         
         return json.dumps(datasets), ''
@@ -881,7 +826,6 @@ def create_de_table_comp(data, output):
                 id=output,
                 data=data.to_dict('records'),
                 columns=[{'id': c, 'name': c} for c in data.columns],
-                # style_as_list_view=True,
                 selected_rows=[],
                 style_cell={'padding': '5px',
                             'whiteSpace': 'no-wrap',
@@ -939,9 +883,6 @@ def add_de_set(btn_add: int, btn_clear: int, de_table: List[dict],
     de_table_sorted = de_table.sort_values(by=['log2FoldChange'], ascending=True)
     de_table_sorted['rank'] = range(1, len(de_table_sorted) + 1)
 
-    print(de_table_sorted)
-    # print(detable_comp)
-
     intermediate_data = json.loads(intermediate_data)
 
     if detable_comp is not None:
@@ -955,11 +896,7 @@ def add_de_set(btn_add: int, btn_clear: int, de_table: List[dict],
         intermediate_data = range(1, len(intermediate_data) + 1)
         intermediate_data = intermediate_data.reindex(de_table_sorted.index)
 
-    #print(de_table_sorted, intermediate_data)
-
     result = pd.concat([de_table_sorted, intermediate_data], axis=1)
-    #print(result)
-
     dataset = {'de_table_comp': result.to_json(orient='split', date_format='iso')}
     data = create_de_table_comp(result, 'de_table_comp')
 
@@ -1004,7 +941,10 @@ def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_r
             out_folder = os.path.join('data','generated')
             if not os.path.isdir(out_folder):
                 cmd = 'mkdir %s' % out_folder
-                os.system(cmd)
+                try:
+                    result = subprocess.run(cmd, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                except subprocess.CalledProcessError as e:
+                    print("Error executing command:", e)
 
             datasets = json.loads(selected_data)
             empty = json.loads(datasets['empty'])
@@ -1030,13 +970,11 @@ def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_r
                             if sample_excl in df_info_temp.index:
                                 df_info_temp = df_info_temp.drop(sample_excl)
                 else:
-                    #print(lSamples)
                     # loading samples from datasets.txt
                     df_info_temp = df_info.loc[lSamples,]
 
                 if fulltext:
                     df_counts_raw = df_counts[df_info_temp.index]
-                    # df_info_temp[['id_tissue', variable_selection2]].apply(lambda x: '_'.join(x), axis=1)
                     df_info_temp.index = df_info_temp['samples']
                     # Change names in count files
                     df_counts_raw.columns = df_info_temp.index
@@ -1047,9 +985,7 @@ def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_r
                     rm_confounding = 'None'
 
                 file_string = search_session(lSamples, transformation, rm_confounding)
-                print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
-                print(file_string, 'file_string')
-                print("before write",file_string)
+                
                 new_run = False
 
                 if file_string is None:
@@ -1080,11 +1016,18 @@ def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_r
 
                 if force_run:
                         print(cmd)
-                        os.system(cmd)
+                        try:
+                            result = subprocess.run(cmd, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                        except subprocess.CalledProcessError as e:
+                            print("Error executing command:", e)
+
                 else:
                     if new_run:
                         print(cmd)
-                        os.system(cmd)
+                        try:
+                            result = subprocess.run(cmd, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                        except subprocess.CalledProcessError as e:
+                            print("Error executing command:", e)
                     else:
                         print('Loading file: %s' % name_out)
 
@@ -1097,7 +1040,6 @@ def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_r
                             'counts_raw_file_name': json.dumps(name_counts_for_pca),
                             'perf_file': json.dumps(name_out),
                             'file_string': json.dumps(file_string)}
-                # 'prefix_sub': json.dumps(sPrefix_tissue_batch_type)}
 
             alert_mess = 'Data loaded successfully.'
 
@@ -1131,8 +1073,6 @@ def update_output1(indata, meta_dropdown_groupby, variable1, variable2, variable
         for x in df_meta_temp[meta_dropdown_groupby].unique():
             df_temp = df_meta_temp.loc[df_meta_temp[meta_dropdown_groupby] == x, ]
             df_temp = df_temp.groupby(variable3).count()
-            print(df_temp)
-            print(df_temp.iloc[0,0])
             trace = go.Bar(x=df_temp.index, y=df_temp.iloc[:,1], name=x)
             ltraces.append(trace)
 
@@ -1141,6 +1081,32 @@ def update_output1(indata, meta_dropdown_groupby, variable1, variable2, variable
             'layout': go.Layout(
             )
         }
+    
+
+@app.callback(
+    Output('ma_plot', 'figure'),
+    Input('intermediate-DEtable', 'children'),
+)
+def generate_maplot(indata):
+    if indata is None:
+        raise PreventUpdate
+    else:
+        datasets = json.loads(indata)
+        df_matable = pd.read_json(StringIO(datasets['ma_table']), orient='split')
+        print('df_matable', df_matable)
+
+        ma_plot_fig = px.scatter(
+            df_matable, 
+            x='mean_norm_counts', 
+            y='log2FoldChange',
+            labels={
+                "mean_norm_counts": "Mean of Normalized Counts (A)",
+                "log2FoldChange": "Log2 Fold Change (M)"
+            },
+            title="MA-Plot"
+        )
+        return ma_plot_fig
+
     
 @app.callback(
     [Output('volcanoplot', 'figure')],
@@ -1175,11 +1141,9 @@ def generate_volcano(effects, indata, psig, xaxis, yaxis):
 
         radiode = datasets['DE_type']
         title_ = datasets['file_string']
-        # pval = 'padj'
 
         pval = yaxis
         effect_size = xaxis
-        print('HIGHLIGHT ', highlight)
         dashVolcano = dashbio.VolcanoPlot(
             dataframe=df_volcano,
             genomewideline_value=genomewideline_value,
@@ -1220,6 +1184,7 @@ def set_biplot_options(selected):
      ])
 def update_hpa(lgenes, input_symbol, lgenes_hgnc):
 
+    #only works for imported data containing Ensembl or hgnc id
     try:
         if lgenes_hgnc:
             dTranslate = dict(df_symbol_sym_ind.loc[lgenes_hgnc]['ensembl_gene_id'])
@@ -1275,7 +1240,8 @@ def update_output1(indata, indata_de, lgenes, input_symbol, radio_grouping, lgen
             sig_gene = 1
         except:
             pass
-
+        
+        #Only works for Ensembl or HGNC id
         try:
             #If the counts data have Ensembl gene names
             dTranslate = dict()
@@ -1375,12 +1341,10 @@ def update_pca_and_barplot(indata, sample_names_toggle, number_of_genes, biplot_
                 df_counts_pca.var(axis=1).sort_values(ascending=False).iloc[0:int(number_of_genes), ].index,]
             df_counts_pca.to_csv('~/Dropbox/dash/pca_counts.tab', sep='\t')
 
-        print(sample_names_toggle, 'sample_names_toggle')
         pca = PCA(n_components=3)
         principalComponents = pca.fit_transform(df_counts_pca.T)
         principalDf = pd.DataFrame(data=principalComponents, columns=['PCA1', 'PCA2', 'PCA3'])
         principalDf.index = df_counts_pca.columns
-        # print(principalDf)
         principalDf[dropdown] = df_meta_temp.loc[principalDf.index,][dropdown]
         traces = []
         ltraces3d = []
@@ -1389,7 +1353,7 @@ def update_pca_and_barplot(indata, sample_names_toggle, number_of_genes, biplot_
         df_comp = pd.DataFrame(pca.components_.T)
         df_comp.index = df_counts_pca.index
         df_top = df_comp.abs().sum(axis=1).sort_values(ascending=False).iloc[0:int(4), ]
-        lTop4_genes = df_top.index.tolist()
+        top_four_genes = df_top.index.tolist()
 
         lDropdown = df_meta_temp[dropdown].unique()
 
@@ -1439,7 +1403,7 @@ def update_pca_and_barplot(indata, sample_names_toggle, number_of_genes, biplot_
                 df_components.index = df_counts_pca.index
                 df_components.columns = principalDf.columns[:3]
                 try:
-                    dTranslate = dict(df_symbol.loc[lTop4_genes]['hgnc_symbol'])
+                    dTranslate = dict(df_symbol.loc[top_four_genes]['hgnc_symbol'])
                 except:
                     pass
                 if biplot_text_radio is not None:
@@ -1450,7 +1414,7 @@ def update_pca_and_barplot(indata, sample_names_toggle, number_of_genes, biplot_
                 else:
                     mode = 'lines'
 
-                for gene in lTop4_genes:
+                for gene in top_four_genes:
                     x = [0, df_components.loc[gene, 'PCA1'] * 100]
                     y = [0, df_components.loc[gene, 'PCA2'] * 100]
                     z = [0, df_components.loc[gene, 'PCA3'] * 100]
@@ -1471,13 +1435,7 @@ def update_pca_and_barplot(indata, sample_names_toggle, number_of_genes, biplot_
 
         df_meta_for_corr = df_meta_temp.dropna(axis='columns')
         principalDf['PCA1'] = pd.to_numeric(principalDf['PCA1'], errors='coerce')
-        #for column in df_meta_for_corr.columns:
-        #    df_meta_for_corr[column] = pd.to_numeric(df_meta_for_corr[column], errors='coerce')
-
         df_meta_for_corr_numeric = df_meta_for_corr.select_dtypes(include=[np.number])
-
-        #correlation_matrix = df_meta_for_corr.corrwith(principalDf['PCA1'], method='pearson')
-
         correlation_matrix = df_meta_for_corr_numeric.corrwith(principalDf['PCA1'], method='pearson')
         
         lPCA_data = []
@@ -1490,18 +1448,6 @@ def update_pca_and_barplot(indata, sample_names_toggle, number_of_genes, biplot_
             'type': 'heatmap',
         })
 
-        #correlation_matrix2 = df_meta_temp.corr(method='pearson')
-        #correlation_matrix2 = correlation_matrix2.fillna(0)
-        #lPCA_data2 = []
-        #lPCA_data2.append({
-        #    'z': correlation_matrix2,
-        #    'y': correlation_matrix2.index.tolist(),
-        #    'x': correlation_matrix2.columns.tolist(),
-        #    'reversescale': 'true',
-        #    'colorscale': [[0, 'white'], [1, 'blue']],
-        #    'type': 'heatmap',
-        #})
-
         width_cor = correlation_matrix.shape[0] * 10
         
         return {'data': traces,
@@ -1512,7 +1458,6 @@ def update_pca_and_barplot(indata, sample_names_toggle, number_of_genes, biplot_
                {"data": ltraces3d,
                 "layout": go.Layout(
                     height=700, title="...",
-                    # paper_bgcolor="#f3f3f3",
                     scene={"aspectmode": "cube", "xaxis": {"title": "PCA1 %.3f" % pca.explained_variance_ratio_[0], },
                            "yaxis": {"title": "PCA2 %.3f" % pca.explained_variance_ratio_[1], },
                            "zaxis": {"title": "PCA3 %.3f" % pca.explained_variance_ratio_[2], }},
@@ -1550,7 +1495,6 @@ def populate_dataset_load(invalue):
             return []
     else:
         return []
-    # options = [{'label': j, 'value': j} for j in lPapers], value = 'New'
 
 
 @app.callback(
@@ -1573,7 +1517,6 @@ def update_de_table(n_clicks, effects, indata, sig_value, basemean):
             datasets = json.loads(indata)
             print('update_de_table')
             df_degenes = pd.read_json(StringIO(datasets['de_table']), orient='split')
-            # print(df_degenes)
             radiode = datasets['DE_type']
             df_degenes = df_degenes.loc[df_degenes['padj'] <= float(sig_value),]
             if 'baseMean' in df_degenes.columns:
@@ -1584,15 +1527,11 @@ def update_de_table(n_clicks, effects, indata, sig_value, basemean):
             df_degenes['wikigene_desc'] = [dTranslate2.get(x, x) for x in df_degenes.index]
             df_degenes1 = df_degenes.loc[df_degenes['log2FoldChange'] < effects[0],]
             df_degenes2 = df_degenes.loc[df_degenes['log2FoldChange'] > effects[1],]
-
             df_degenes = pd.concat([df_degenes1, df_degenes2])
             number_of_degenes = df_degenes.shape[0]
-            # number_of_degenes = '#DE-genes: ' + str(number_of_degenes) + ' / ' + str(df_counts_combined.shape[0]), \
-            #                    ' (%s | %s)'%(df_degenes1.shape[0], df_degenes2.shape[0]), ' Fold Change: %s %s'\
-            #                    %(effects[0], effects[1])
-
             name = f"{datasets['file_string']}_{effects[0]}_{effects[1]}_de.tab"
             overlap_genes = list(set(df_degenes.index).intersection(set(df_symbol.index)))
+
             try:
                 dTranslate = dict(df_symbol.loc[overlap_genes]['hgnc_symbol'])
                 df_degenes['hgnc'] = [dTranslate.get(x, x) for x in df_degenes.index]
@@ -1614,7 +1553,6 @@ def export_de(n_clicks, indata, prefixes):
         raise PreventUpdate
     else:
         if indata:
-
             datasets = json.loads(indata)
             df_degenes = pd.read_json(StringIO(datasets['de_table']), orient='split')
             try:
@@ -1652,9 +1590,7 @@ def run_DE_analysis(n_clicks, indata, program, transformation, force_run, rowsum
     if n_clicks is None:
         raise PreventUpdate
     else:
-        print('eh')
         datasets = json.loads(indata)
-        # df_meta_temp = pd.read_json(datasets['meta'], orient='split')
         outdir = os.path.join('data','generated')
         name_counts = json.loads(datasets['counts_raw_file_name'])
         file_string = json.loads(datasets['file_string'])
@@ -1670,21 +1606,16 @@ def run_DE_analysis(n_clicks, indata, program, transformation, force_run, rowsum
         }
         df_new = pd.DataFrame(data)
         df_new['timestamp'] = datetime.now()
-        print('1')
+        
         if os.path.isfile(logfile):
             df_log = pd.read_csv(logfile)
-            #df_log = df_log.append(df_new, ignore_index=True)
             df_log = pd.concat([df_log, df_new], ignore_index=True)
         else:
             # if logfile does not exist, use the new dataframe
             df_log = df_new
 
         df_log.to_csv(logfile, index=False)
-        print('2')
-        # lTotal = json.loads(datasets['prefixes'])
-        # sTotal = '_'.join(lTotal)
-        # file_string_program = lTotal + [program]
-        # sTotalDE = sTotal + '_' + program
+
         name_meta = os.path.join('data', 'generated', f'{file_string}_meta.tab')
         name_out = os.path.join('data', 'generated', f'{file_string}_DE.tab')
 
@@ -1699,22 +1630,30 @@ def run_DE_analysis(n_clicks, indata, program, transformation, force_run, rowsum
                 name_counts, name_meta, 'none', reference,
                 name_out)
         '''
-        
-        if not os.path.isfile(name_out):
-            #print(cmd)
-            #os.system(cmd)
-            if program == 'DESeq2':
-                r_script_path = os.path.join('functions', 'run_deseq2.R')
-                cmd = f'Rscript {r_script_path} {name_counts} {name_meta} {rowsum} {design} {reference} {name_out}'
+        name_ma_table = None
 
-            elif program == 'edgeR':
-                r_script_path = os.path.join('functions', 'run_edgeR.R')
-                cmd = f'Rscript {r_script_path} {name_counts} {name_meta} {design} {reference} {name_out}'
+        if program == 'DESeq2':
+            name_ma_table =  os.path.join('data', 'generated', f'{file_string}_maplot.tab')
+            r_script_path = os.path.join('functions', 'run_deseq2.R')
+            cmd = f'Rscript {r_script_path} {name_counts} {name_meta} {rowsum} {design} {reference} {name_out} {name_ma_table}'
+            
 
+        elif program == 'edgeR':
+            r_script_path = os.path.join('functions', 'run_edgeR.R')
+            cmd = f'Rscript {r_script_path} {name_counts} {name_meta} {design} {reference} {name_out}'
+            
+
+        if os.path.isfile(name_out) and not force_run:
+            print("Output file already exists. Use 'force_run' to override.")
         else:
-            if force_run:
-                print(cmd)
-                os.system(cmd)
+            try:
+                # Run the subprocess command
+                result = subprocess.run(cmd, check=True, text=True, capture_output=True)
+                print("DE analysis completed successfully.")
+                print("Output:", result.stdout)
+            except subprocess.CalledProcessError as e:
+                print("Failed to run edgeR analysis.")
+                print("Error:", e.stderr)
 
         df_degenes = pd.read_csv(name_out, sep='\t')
 
@@ -1733,8 +1672,13 @@ def run_DE_analysis(n_clicks, indata, program, transformation, force_run, rowsum
         except:
             pass
 
-        datasets = {'de_table': df_degenes.to_json(orient='split'), 'DE_type': program, 'file_string': file_string}
-        print('4')
+        if name_ma_table:
+            ma_table = pd.read_csv(name_ma_table, sep='\t')
+        else:
+            ma_table = pd.DataFrame()
+
+        datasets = {'de_table': df_degenes.to_json(orient='split'), 'DE_type': program, 'file_string': file_string, 'ma_table': ma_table.to_json(orient='split')}
+        
         print('DE done')
         return json.dumps(datasets), 'temp', ''
 
@@ -1835,10 +1779,8 @@ def enrichr_up(n_clicks, indata, indata_de, sig_value):
 
         prefix = os.path.join(out_folder, file_string)
 
-        # Use os.makedirs to create the directory if it does not exist
+        # Create the directory if it does not exist
         os.makedirs(out_folder, exist_ok=True)
-        print(df_degenes)
-        print('!!!')
         df_degenes = df_degenes[df_degenes['padj'] <= float(sig_value)]
 
         df_degenes_up = df_degenes[df_degenes['log2FoldChange'] > 0]
@@ -1873,7 +1815,10 @@ def enrichr_up(n_clicks, indata, indata_de, sig_value):
                         python_executable = sys.executable
                         enrichr_path = os.path.join('enrichr-api', 'query_enrichr_py3.py')
                         cmd = f'{python_executable} {enrichr_path} {genes_path} {updn}_{db} {db} {fOut}'
-                        os.system(cmd)
+                        try:
+                            result = subprocess.run(cmd, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                        except subprocess.CalledProcessError as e:
+                            print("Error executing command:", e)
 
                     df = pd.read_csv(fOut + '.txt', sep='\t', index_col=None)
 
@@ -1904,7 +1849,6 @@ def enrichr_up(n_clicks, indata, indata_de, sig_value):
         return lOutput[0], lOutput[1], lOutput[2], lOutput[3], lOutput[4], lOutput[5], lOutput[6], lOutput[7], ''
 
 if __name__ == "__main__":
-    # app.run_server(debug=True, host='130.238.239.158')
     ascii_banner = pyfiglet.figlet_format("RNA analysis")
     print(ascii_banner)
     #app.run_server(debug=True, host='localhost')

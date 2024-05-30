@@ -27,7 +27,7 @@ extract_last_variable <- function(input_string) {
 }
 
 # Function to run DESeq2 analysis
-run_DE <- function(indata, insample, rowm, design, outfile, reference) {
+run_DE <- function(indata, insample, rowm, design, outfile, reference, name_ma_table) {
 
   if (is.character(indata)) {
     countData <- indata <- read.table(indata, sep='\t', header=TRUE, row.names=1)
@@ -75,10 +75,16 @@ run_DE <- function(indata, insample, rowm, design, outfile, reference) {
   res <- na.omit(resultDESeq2)
   write.table(res, outfile, sep='\t', quote=FALSE)
   
-  # Generate MA plot and save as PDF
-  #pdf('plotMA.pdf')
-  #plotMA(resultDESeq2)
-  #dev.off()
+  log2FoldChange <- res$log2FoldChange
+
+  # Compute mean of normalized counts for A value
+  norm_counts <- counts(dds2, normalized=TRUE)
+  mean_norm_counts <- rowMeans(norm_counts)
+
+  # Create a dataframe for exporting
+  ma_data <- data.frame(mean_norm_counts, log2FoldChange)
+  write.table(ma_data, name_ma_table, sep='\t', quote=FALSE)
+
 }
 
 
@@ -91,7 +97,8 @@ if (!interactive()) {
   design <- args[4]
   reference <- args[5]
   outfile <- args[6]
+  name_ma_table <- args[7]
 
   # Run DESeq2 analysis
-  run_DE(indata, insample, rowm, design, outfile, reference)
+  run_DE(indata, insample, rowm, design, outfile, reference, name_ma_table)
 }
