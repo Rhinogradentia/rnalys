@@ -1,6 +1,6 @@
 suppressPackageStartupMessages(library('DESeq2'))
 suppressPackageStartupMessages(library('limma'))
-suppressPackageStartupMessages(library('qsmooth'))
+#suppressPackageStartupMessages(library('qsmooth'))
 
 ##DESEQ2 is used for variance stabalizing and rlog transformation
 # Function to normalize RNA-seq data using various methods and optionally remove batch effects

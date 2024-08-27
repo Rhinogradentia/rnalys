@@ -913,143 +913,128 @@ background_pipe = {
 
 ##main table: intermediate-table
 @app.callback(
-    [Output('intermediate-table', 'children'),
-     Output('alert_main_table', 'hide'),
-     Output('submit-done', 'children'),
-     Output('select_to_explore_block', 'style'),
-     Output('sample_to_pca_block', 'style'),
-     Output('pca_to_de_block', 'style')],
-    Input('btn-selected_data_submit', 'n_clicks'),
-    State('selected_data', 'children'),
-    State('rm_confounding', 'value'),
-    State('full_text', 'value'),
-    State('force_run', 'value'),
-    State('df_counts', 'data'),
-    State('df_info', 'data'),
-    State('variable_selection1_store', 'data'),
-    State('variable_selection2_store', 'data'),
-    State('variable_selection3_store', 'data'),
-    prevent_initial_call=True)
+    [
+        Output('intermediate-table', 'children'),
+        Output('alert_main_table', 'is_open'),
+        Output('submit-done', 'children'),
+        #Output('select_to_explore_block', 'style'),
+        #Output('sample_to_pca_block', 'style'),
+        #Output('pca_to_de_block', 'style'),
+    ],
+    [Input('btn-selected_data_submit', 'n_clicks')],
+    [State('selected_data', 'children'),
+     State('rm_confounding', 'value'),
+     State('full_text', 'value'),
+     State('force_run', 'value'),
+     State('df_counts', 'data'),
+     State('df_info', 'data'),
+     State('variable_selection1_store', 'data'),
+     State('variable_selection2_store', 'data'),
+     State('variable_selection3_store', 'data')],
+    prevent_initial_call=True
+)
 def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_run, df_counts, df_info,
                       variable_selection1, variable_selection2, variable_selection3):
     if n_clicks == 0:
         raise PreventUpdate
-    else:
-        if df_counts is not None:
-            df_counts = pd.read_json(StringIO(df_counts), orient='split')
-            df_info = pd.read_json(StringIO(df_info), orient='split')
-            out_folder = os.path.join('data','generated')
-            if not os.path.isdir(out_folder):
-                cmd = 'mkdir %s' % out_folder
+
+    # Perform the long-running task
+    if df_counts is not None:
+        df_counts = pd.read_json(StringIO(df_counts), orient='split')
+        df_info = pd.read_json(StringIO(df_info), orient='split')
+        out_folder = os.path.join('data', 'generated')
+        if not os.path.isdir(out_folder):
+            cmd = f'mkdir {out_folder}'
+            try:
+                subprocess.run(cmd, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            except subprocess.CalledProcessError as e:
+                print("Error executing command:", e)
+
+        datasets = json.loads(selected_data)
+        empty = json.loads(datasets['empty'])
+        if empty != '0':
+            var1_dropdown = json.loads(datasets[variable_selection1])
+            var2_dropdown = json.loads(datasets[variable_selection2])
+            var3_dropdown = json.loads(datasets[variable_selection3])
+            exclude = json.loads(datasets['exclude'])
+            transformation = datasets['transformation']
+            lSamples = json.loads(datasets['samples'])
+
+            # Process the data as per your logic
+            if len(lSamples) == 0:
+                df_info_temp = df_info.loc[
+                    df_info.loc[df_info[variable_selection1].isin(var1_dropdown), ].index]
+                df_info_temp = df_info_temp.loc[
+                    df_info_temp.loc[df_info_temp[variable_selection2].isin(var2_dropdown), ].index]
+                df_info_temp = df_info_temp.loc[df_info_temp[variable_selection3].isin(var3_dropdown), ]
+                if exclude:
+                    for sample_excl in exclude:
+                        if sample_excl in df_info_temp.index:
+                            df_info_temp = df_info_temp.drop(sample_excl)
+            else:
+                df_info_temp = df_info.loc[lSamples,]
+
+            if fulltext:
+                df_counts_raw = df_counts[df_info_temp.index]
+                df_info_temp.index = df_info_temp['samples']
+                df_counts_raw.columns = df_info_temp.index
+            else:
+                df_counts_raw = df_counts[df_info_temp.index]
+
+            if rm_confounding is None:
+                rm_confounding = 'None'
+
+            file_string = search_session(lSamples, transformation, rm_confounding)
+
+            new_run = False
+            if file_string is None:
+                new_run = True
+                file_string = generate_random_string()
+                write_session_to_file(list(df_info_temp.index), rm_confounding, transformation, file_string)
+            else:
+                print(file_string, 'is not None')
+
+            name_counts_for_pca = os.path.join('data', 'generated', f'{file_string}_counts.tab')
+            name_meta_for_pca = os.path.join('data', 'generated', f'{file_string}_meta.tab')
+
+            df_counts_raw.to_csv(name_counts_for_pca, sep='\t')
+            df_info_temp.to_csv(name_meta_for_pca, sep='\t')
+
+            name_out = os.path.join('data', 'generated', f'{file_string}_normalized.tab')
+            r_script_path = os.path.join('functions', 'data_transformation.R')
+
+            cmd = f'Rscript {r_script_path} {name_counts_for_pca} {name_meta_for_pca} {rm_confounding} {name_out} {transformation}'
+
+            print('forcerun', force_run)
+
+            if force_run or new_run:
+                print(cmd)
                 try:
-                    result = subprocess.run(cmd, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                    subprocess.run(cmd, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
                 except subprocess.CalledProcessError as e:
                     print("Error executing command:", e)
+            else:
+                print('Loading file: %s' % name_out)
 
-            datasets = json.loads(selected_data)
-            empty = json.loads(datasets['empty'])
-            if empty != '0':
-                var1_dropdown = json.loads(datasets[variable_selection1])
-                var2_dropdown = json.loads(datasets[variable_selection2])
-                var3_dropdown = json.loads(datasets[variable_selection3])
-                exclude = json.loads(datasets['exclude'])
-                transformation = datasets['transformation']
-                lSamples = json.loads(datasets['samples'])
-                if len(lSamples) == 0:
+            df_counts_temp_norm = pd.read_csv(name_out, sep='\t', index_col=0)
+            datasets = {'counts_norm': df_counts_temp_norm.to_json(orient='split', date_format='iso'),
+                        'transformation': transformation,
+                        'meta': df_info_temp.to_json(orient='split', date_format='iso'),
+                        'counts_raw': df_counts_raw.to_json(orient='split', date_format='iso'),
+                        'counts_raw_file_name': json.dumps(name_counts_for_pca),
+                        'perf_file': json.dumps(name_out),
+                        'file_string': json.dumps(file_string)}
 
-                    df_info_temp = df_info.loc[
-                        df_info.loc[df_info[variable_selection1].isin(var1_dropdown), ].index]
+        alert_mess = 'Data loaded successfully.'
 
-                    df_info_temp = df_info_temp.loc[
-                        df_info_temp.loc[df_info_temp[variable_selection2].isin(var2_dropdown), ].index]
+        # Update the UI after processing is complete
+        submit_done_content = ''
+        #block_style = {'display': 'block'}
 
-                    df_info_temp = df_info_temp.loc[df_info_temp[variable_selection3].isin(var3_dropdown), ]
+        return json.dumps(datasets), True, submit_done_content
 
-                    if exclude:
-                        for sample_excl in exclude:
-                            if sample_excl in df_info_temp.index:
-                                df_info_temp = df_info_temp.drop(sample_excl)
-                else:
-                    # loading samples from datasets.txt
-                    df_info_temp = df_info.loc[lSamples,]
-
-                if fulltext:
-                    df_counts_raw = df_counts[df_info_temp.index]
-                    df_info_temp.index = df_info_temp['samples']
-                    # Change names in count files
-                    df_counts_raw.columns = df_info_temp.index
-                else:
-                    df_counts_raw = df_counts[df_info_temp.index]
-
-                if rm_confounding is None:
-                    rm_confounding = 'None'
-
-                file_string = search_session(lSamples, transformation, rm_confounding)
-                
-                new_run = False
-
-                if file_string is None:
-                    new_run = True
-                    file_string = generate_random_string()
-                    write_session_to_file(list(df_info_temp.index), rm_confounding, transformation, file_string)
-                else:
-                    print(file_string, 'is not None')
-                
-                name_counts_for_pca = os.path.join('data', 'generated', f'{file_string}_counts.tab')
-                
-                name_meta_for_pca = os.path.join('data', 'generated', f'{file_string}_meta.tab')
-
-                # Save the dataframes to the respective files
-                df_counts_raw.to_csv(name_counts_for_pca, sep='\t')
-                df_info_temp.to_csv(name_meta_for_pca, sep='\t')
-
-                # Construct the output path for normalized data
-                name_out = os.path.join('data', 'generated', f'{file_string}_normalized.tab')
-
-                # Construct the path for the R script
-                r_script_path = os.path.join('functions', 'data_transformation.R')
-
-                # Format the command to run the R script, using the constructed paths
-                cmd = f'Rscript {r_script_path} {name_counts_for_pca} {name_meta_for_pca} {rm_confounding} {name_out} {transformation}'
-
-                print('forcerun',force_run)
-
-                if force_run:
-                        print(cmd)
-                        try:
-                            result = subprocess.run(cmd, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-                        except subprocess.CalledProcessError as e:
-                            print("Error executing command:", e)
-
-                else:
-                    if new_run:
-                        print(cmd)
-                        try:
-                            result = subprocess.run(cmd, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-                        except subprocess.CalledProcessError as e:
-                            print("Error executing command:", e)
-                    else:
-                        print('Loading file: %s' % name_out)
-
-                df_counts_temp_norm = pd.read_csv(name_out, sep='\t', index_col=0)
-
-                datasets = {'counts_norm': df_counts_temp_norm.to_json(orient='split', date_format='iso'),
-                            'transformation': transformation,
-                            'meta': df_info_temp.to_json(orient='split', date_format='iso'),
-                            'counts_raw': df_counts_raw.to_json(orient='split', date_format='iso'),
-                            'counts_raw_file_name': json.dumps(name_counts_for_pca),
-                            'perf_file': json.dumps(name_out),
-                            'file_string': json.dumps(file_string)}
-
-            alert_mess = 'Data loaded successfully.'
-
-            return json.dumps(datasets), alert_mess, '', background_pipe, background_pipe, background_pipe
-
-        else:
-            raise PreventUpdate
-
-
-
+    else:
+        raise PreventUpdate
 
 @app.callback(
     Output('barplot', 'figure'),
@@ -1259,14 +1244,22 @@ def update_output1(indata, indata_de, lgenes, input_symbol, radio_grouping, lgen
         lgrps = []
         lSamples = []
 
-        if radio_grouping == 'var1':
-            cond = var1
-        elif radio_grouping == 'var2':
-            cond = var2
-        elif radio_grouping == 'var3':
-            cond = var3
-        else:
+        print('RADIO:::::::: ',radio_grouping)
+        #radio_grouping = radio_grouping[0]
+                
+        grouping_map = {
+            'var1': var1,
+            'var2': var2,
+            'var3': var3
+        }
+
+        # Retrieve the appropriate condition based on radio_grouping
+        cond = grouping_map.get(radio_grouping)
+
+        # Error handling if radio_grouping does not match any key
+        if cond is None:
             print('error radio_grouping', radio_grouping, var1, var2, var3)
+
         lgrouping = df_meta_temp[cond].unique()
 
         print(lgrouping)
@@ -1847,6 +1840,44 @@ def enrichr_up(n_clicks, indata, indata_de, sig_value):
                 lOutput.append(output)
 
         return lOutput[0], lOutput[1], lOutput[2], lOutput[3], lOutput[4], lOutput[5], lOutput[6], lOutput[7], ''
+
+
+
+@app.callback(
+    Output('export_enrichr_plot', 'children'),
+    Input('btn_export_enrichr_plot', 'n_clicks_timestamp'),
+    State('intermediate-DEtable', 'children'),
+    State('intermediate-table', 'children'))
+def export_enrichr_plot(n_clicks, indata, prefixes):
+    if n_clicks is None:
+        raise PreventUpdate
+    else:
+        if indata:
+            datasets = json.loads(indata)        
+            file_string = datasets['file_string']
+            print(file_string)
+
+            outdir = os.path.join('data', 'scripts')
+
+            enrichr_file = file_string + '_enrichr.R'
+            enrichr_file_path = os.path.join('data', 'scripts', enrichr_file)
+            enrichr_template_path = os.path.join('data', 'templates', 'plot_enrichr.py')
+
+            # Read in the file
+            with open(enrichr_template_path, 'r') as file:
+                filedata = file.read()
+
+            # Replace the target string
+            filedata = filedata.replace('_fileid_', file_string)
+            
+            # Write the file out again
+            with open(enrichr_file_path, 'w') as file:
+                file.write(filedata)
+            return [f'Created enrichr plot file {enrichr_file}']
+
+        else:
+            print('Run DE Enrichr first')
+            return ['Can not create plot (run the analysis)']
 
 if __name__ == "__main__":
     ascii_banner = pyfiglet.figlet_format("RNA analysis")

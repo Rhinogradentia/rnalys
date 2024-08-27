@@ -195,7 +195,7 @@ layout_page1 = html.Div(
 
                     #html.Div(id='read_table'),
                     html.Div(id='selected_data', style={'display': 'none'}),
-                    html.Div(id='intermediate-table', style={'display': 'none'}),
+                    
 
                 ], className='row', style={'width': '50%','display': 'inline-block', 'margin-bottom': '10px'}),
 
@@ -246,62 +246,46 @@ layout_page1 = html.Div(
                                         'width': '50%',  # Adjust width as necessary
                                     }
                             ),
-                            
+                            #dbc.Alert("Data loaded successfully.", id='alert_main_table', is_open=False),
                             # RIGHT SIDE
                             html.Div(
                                 [
                                     html.Div(
-                                        [
-                                            html.Div(
-                                                [
-                                                    dbc.Button(
-                                                        'Submit', 
-                                                        id='btn-selected_data_submit', 
-                                                        n_clicks=0, 
-                                                        size='md'
-                                                    ),
-                                                ], 
-                                                style={
-                                                    'width': '30%', 
-                                                    'display': 'flex', 
-                                                    'align-items': 'center', 
-                                                    'margin-top': '5px',
-                                                    'margin-right': '5px'
-                                                }
-                                            ),
 
+                                        children=[
+                                            # Main Div container
                                             html.Div(
-                                                [
-                                                    dbc.Spinner(
-                                                        html.Div(id="submit-done"), 
-                                                        #size='md', 
-                                                        #delay_hide=1, 
-                                                        #delay_show=1,
-                                                        show_initially=False, 
-                                                        color="primary",
-                                                        #type="grow"
-                                                    ),
-                                                    #dbc.Spinner(html.Div(
-                                                    #    id="submit-done"),
-                                                    #    show_initially=False,
-                                                    #    spinner_style={"width": "3rem", "height": "3rem"})
-                                                ], 
-                                                style={
-                                                    'display': 'flex', 
-                                                    'align-items': 'center', 
-                                                    'margin-left': '25px'
-                                                }
+                                                children=[
+                                            # Submit button
+                                            dbc.Button(
+                                                'Submit', 
+                                                id='btn-selected_data_submit', 
+                                                n_clicks=0, 
+                                                size='md',
+                                                style={'display': 'inline-block'}  # Add margin to the right of the button
                                             ),
-
+                                            
+                                            # Loading button with spinner (initially hidden)
+                                            dcc.Loading(
+                                                id="loading-indicator",
+                                                type="circle", 
+                                                children=[
+                                                    html.Div(id='intermediate-table', style={'display': 'none'}),
+                                                    html.Div(id="submit-done"),
+                                                ],
+                                                fullscreen=False,
+                                                style={'margin-left':'50px'}
+                                            )
                                         ],
                                         style={
-                                            'display': 'flex', 
-                                            'flex-direction': 'row', 
-                                            'align-items': 'center',  # Align items in this row in the center
-                                            'justify-content': 'flex-start',  # Start alignment horizontally
+                                            'display': 'flex',
+                                            'align-items': 'center',
+                                            'justify-content': 'flex-start',  # Align to the start to maintain the margin effect
                                             'width': '100%'
                                         }
-                                    )
+                                            ),
+                                        ]
+                                )
                                 ], 
                                 style={
                                     'display': 'flex', 
@@ -382,24 +366,46 @@ layout_page1 = html.Div(
                 html.Div([
 
                     html.Div([
-                        html.H4('Display options'),
+                        html.H4('Display options', style={'padding': '0px', 'margin-top': '2px', 'margin-bottom':'2px'}),
+
+                    
+                        html.Div([
+                            html.P('Gene ID: ',
+                                style={'width': '100px', 'display': 'flex', 'verticalAlign': "middle",
+                                        'padding': '2px', 'margin-top':'5px'}),
+                            html.Div([dcc.Dropdown(id='radio_symbol',
+                                        options=[{'label': j+' ', 'value': j} for j in ['Ensembl ', 'Symbol']],
+                                        multi=False,
+                                        value=['Ensembl'])
+                                    ], style={'display': 'inline-block', 'width': '80%', 'verticalAlign': "middle", 'margin-top':'5px'}),
+                        ],  style={'display': 'flex', 'verticalAlign': "middle", 'width': '100%'}),
 
                         html.Div([
-                            dcc.RadioItems(id='radio_symbol',
-                                           options=[{'label': j+' ', 'value': j} for j in ['Ensembl', 'Symbol']],
-                                           value='Ensembl', labelStyle={'display': 'inline-block'}),
-                        ]),
-                        html.Div([
-                            dcc.RadioItems(id='radio-grouping',
-                                           options=[
-                                               #{'label': 'Tissue', 'value': 'tissue'},
-                                               {'label': 'Variable 1  ', 'value': 'var1'},
-                                               #{'label': 'Type', 'value': 'type'},
-                                               {'label': 'Variable 2  ', 'value': 'var2'},
+                            html.P('Group by: ',
+                                style={'width': '100px', 'display': 'flex', 'verticalAlign': "middle",
+                                        'padding': '2px'}),
+                            html.Div([dcc.Dropdown(id='radio-grouping',
+                                            options=[
+                                               {'label': 'Variable 1 ', 'value': 'var1'},
+                                               {'label': 'Variable 2 ', 'value': 'var2'},
                                                {'label': 'Batch ', 'value': 'var3'},
                                            ],
-                                           value='var1', labelStyle={'display': 'inline-block'}),
-                        ]),
+                                        multi=False,
+                                        value='var1')
+                                    ], style={'display': 'inline-block', 'width': '80%', 'verticalAlign': "middle"}),
+                        ],  style={'display': 'flex', 'verticalAlign': "middle", 'width': '100%'}),
+
+                        #html.Div([
+                        #    dcc.RadioItems(id='radio-grouping',
+                        #                   options=[
+                        #                       #{'label': 'Tissue', 'value': 'tissue'},
+                        #                       {'label': 'Variable 1 ', 'value': 'var1'},
+                        #                       #{'label': 'Type', 'value': 'type'},
+                        #                       {'label': 'Variable 2 ', 'value': 'var2'},
+                        #                       {'label': 'Batch ', 'value': 'var3'},
+                        #                   ],
+                        #                   value='var1', labelStyle={'display': 'inline-block'}),
+                        #]),
 
                         dcc.Checklist(id='full_text',
                                       options=[
@@ -663,11 +669,28 @@ layout_page1 = html.Div(
 
             # Buttons
             html.Div([
-                dbc.Button('Run analysis', id='btn-DE', n_clicks=None, style={'width': '80%', 'margin-right': '5px'}),
+                html.Div(
+                    children=[
+                        dbc.Button('Run analysis', id='btn-DE', n_clicks=None, style={'width': '49%', 'margin-right': '5px'}),
+                                        
+                        # Loading button with spinner (initially hidden)
+                        dcc.Loading(
+                            id="loading-indicator",
+                            type="circle", 
+                            children=[
+                                html.Div(id='intermediate-DEtable', style={'display': 'none'}),
+                                html.Div(id="submit-de-done")
+                            ],
+                            fullscreen=False,
+                            style={'margin-left':'50px'},
+                        )
+                ], style={'width': '100%', 'padding': '5px', 'display': 'flex', 'flex-direction': 'row', 'align-items': 'center'}),
+            ]),
+            html.Div([    
+                
                 dbc.Button('Export table', id='btn_export', style={'width': '80%', 'margin-right': '5px'}),
                 dbc.Button('Export plot', id='btn_export_plot', style={'width': '80%', 'margin-right': '5px'}),
-                dbc.Spinner(html.Div(id="submit-de-done"), size='md', delay_hide=1, delay_show=1,
-                            show_initially=False, color="primary"),
+                
             ], style={'width': '100%', 'padding': '5px', 'display': 'flex', 'flex-direction': 'row', 'align-items': 'center'})
         ], style={'width': '30%', 'display': 'inline-block', 'padding': '10px'}),
 
@@ -721,7 +744,7 @@ layout_page1 = html.Div(
 
             html.Br(),
             html.P(id='export_placeholder'),
-            html.Div(id='intermediate-DEtable', style={'display': 'none'}),
+            
             html.Div(id='temp', style={'display': 'none'}),
             html.Div(id='pvalue', style={'display': 'none'}),
             html.Div(id='export_plot_clicked'),
@@ -823,14 +846,17 @@ layout_page1 = html.Div(
                 [
                     html.Div([
                         dbc.Button('Enrichr', id='btn-enrichr', n_clicks=None),
-                    ], style={'width': '20%', 'display': 'flex', 'flex-direction': 'row', 'margin-top': '10px'}),
+                        dbc.Button('Export plot', id='btn_export_enrichr_plot', n_clicks=None, style={'width': '20%', 'margin-left': '5px'}),
+                        html.P(id='export_enrichr_plot'),
+                    ], style={'width': '100%', 'display': 'flex', 'flex-direction': 'row', 'margin-top': '10px'}),
                     html.Div([
                         dbc.Spinner(html.Div(id="submit_done_enrichr"), size='md', delay_hide=1, delay_show=1,
-                                    show_initially=False, color="primary"),
+                                    show_initially=False, color="primary", type='grow'),
                     ], style={'margin-left': '25px', 'display': 'flex', 'align-items': 'center'}),
+                    
                 ], style={'width': '40%', 'display': 'flex', 'flex-direction': 'row', 'align-items': 'center'}
             ),
-
+            
             html.Div([
                 dbc.Tabs(
                     [
