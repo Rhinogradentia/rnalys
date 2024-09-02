@@ -13,6 +13,3 @@ Flask-SeaSurf==1.1.1
 matplotlib==3.5.3
 Pandas==1.3.5
 plotly==5.10.0
-
-
-

@@ -63,6 +63,7 @@ FONT_AWESOME = "https://use.fontawesome.com/releases/v5.10.2/css/all.css"
 
 app = dash.Dash(
     __name__,
+    meta_tags=[{"name": "viewport", "content": "width=device-width, initial-scale=0.8, user-scalable=no"}],
     external_stylesheets=[dbc.themes.LITERA, FONT_AWESOME],
     suppress_callback_exceptions=True
 )
@@ -482,17 +483,15 @@ def update_info_data(contents, example_data_btn, filename, date):
     else:
         if contents is None:
             raise PreventUpdate
-        print('1')
         content_type, content_string = contents.split(',')
         decoded = base64.b64decode(content_string)
-        print('2')
+
         if 'csv' in filename:
             sep = ','
         elif 'tab' in filename or 'tsv' in filename:
             sep = '\t'
         else:
             return pd.DataFrame().to_json(), [], [], {'display': 'inline-block'}
-        print('3')
         df = pd.read_csv(io.StringIO(decoded.decode('utf-8')), sep=sep, index_col=0)
 
     return df.to_json(date_format='iso', orient='split'), list(df.columns), list(df.index), {'display': 'none'}
@@ -611,7 +610,6 @@ def select_var1(df_info, variable1_value):
         raise PreventUpdate
     else:
         df_info = pd.read_json(StringIO(df_info), orient='split')
-        print(df_info)
         ret = [{'label': j, 'value': j} for j in df_info[str(variable1_value)].unique()]
         filtered_data = [item for item in ret if item["label"] is not None and item["value"] is not None]
         return filtered_data
@@ -789,6 +787,7 @@ def export_plot(n_clicks, indata, prefixes):
     prevent_initial_call=True)
 def select_info(lExclude, transformation, variable1_dropdown, variable2_dropdown, variable3_dropdown, variable1,
                 variable2, variable3, df_info):
+
     # variable_selection1_store = column_name_variable1 = tissue
     # variable1 = LV RV etc
 
@@ -916,7 +915,7 @@ background_pipe = {
     [
         Output('intermediate-table', 'children'),
         Output('alert_main_table', 'is_open'),
-        Output('submit-done', 'children'),
+        #Output('submit-done', 'children'),
         #Output('select_to_explore_block', 'style'),
         #Output('sample_to_pca_block', 'style'),
         #Output('pca_to_de_block', 'style'),
@@ -933,7 +932,7 @@ background_pipe = {
      State('variable_selection3_store', 'data')],
     prevent_initial_call=True
 )
-def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_run, df_counts, df_info,
+def table_update(n_clicks, selected_data, rm_confounding, fulltext, force_run, df_counts, df_info,
                       variable_selection1, variable_selection2, variable_selection3):
     if n_clicks == 0:
         raise PreventUpdate
@@ -960,7 +959,9 @@ def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_r
             transformation = datasets['transformation']
             lSamples = json.loads(datasets['samples'])
 
-            # Process the data as per your logic
+            if transformation is None:
+                return json.dumps({}), True
+
             if len(lSamples) == 0:
                 df_info_temp = df_info.loc[
                     df_info.loc[df_info[variable_selection1].isin(var1_dropdown), ].index]
@@ -991,9 +992,7 @@ def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_r
                 new_run = True
                 file_string = generate_random_string()
                 write_session_to_file(list(df_info_temp.index), rm_confounding, transformation, file_string)
-            else:
-                print(file_string, 'is not None')
-
+           
             name_counts_for_pca = os.path.join('data', 'generated', f'{file_string}_counts.tab')
             name_meta_for_pca = os.path.join('data', 'generated', f'{file_string}_meta.tab')
 
@@ -1027,12 +1026,9 @@ def log2_table_update(n_clicks, selected_data, rm_confounding, fulltext, force_r
 
         alert_mess = 'Data loaded successfully.'
 
-        # Update the UI after processing is complete
-        submit_done_content = ''
         #block_style = {'display': 'block'}
 
-        return json.dumps(datasets), True, submit_done_content
-
+        return json.dumps(datasets), False
     else:
         raise PreventUpdate
 
@@ -1063,8 +1059,14 @@ def update_output1(indata, meta_dropdown_groupby, variable1, variable2, variable
 
         return {
             'data': ltraces,
-            'layout': go.Layout(
-            )
+            'layout': go.Layout(height=600,
+                                    margin={'l':200,
+                                            'r':200,
+                                            'b':150,
+                                            't':100
+                                            }
+                                    )
+            
         }
     
 
@@ -1078,7 +1080,6 @@ def generate_maplot(indata):
     else:
         datasets = json.loads(indata)
         df_matable = pd.read_json(StringIO(datasets['ma_table']), orient='split')
-        print('df_matable', df_matable)
 
         ma_plot_fig = px.scatter(
             df_matable, 
@@ -1262,7 +1263,6 @@ def update_output1(indata, indata_de, lgenes, input_symbol, radio_grouping, lgen
 
         lgrouping = df_meta_temp[cond].unique()
 
-        print(lgrouping)
         for grp in lgrouping:
             lgrps = lgrps + df_meta_temp.loc[df_meta_temp[cond] == grp,][cond].tolist()
             lSamples.append(df_meta_temp.loc[df_meta_temp[cond] == grp,].index.tolist())
@@ -1296,7 +1296,6 @@ def update_output1(indata, indata_de, lgenes, input_symbol, radio_grouping, lgen
     [Input('pca-graph', 'clickData')])
 def clicked_out(clickData):
     try:
-        print(clickData['points'][0]['text'])
         return clickData['points'][0]['text']
     except:
         pass
@@ -1350,43 +1349,43 @@ def update_pca_and_barplot(indata, sample_names_toggle, number_of_genes, biplot_
 
         lDropdown = df_meta_temp[dropdown].unique()
 
-        if isinstance(lDropdown[0], (int, float)):
+        #if isinstance(lDropdown[0], (int, float)):
+
+        #    if sample_names_toggle:
+        #        mode_ = 'markers+text'
+        #    else:
+        #        mode_ = 'markers'  #
+
+        #    traces.append(go.Scatter(x=principalDf['PCA1'], y=principalDf['PCA2'],
+        #                             marker={'size': 14, 'colorbar': {'title': '--'},
+        #                                     'color': df_meta_temp[dropdown]},
+        #                             text=principalDf.index, mode=mode_, textposition='top center', showlegend=False))
+
+        #else:
+
+        for grp in df_meta_temp[dropdown].unique():
+            principalDf_temp = principalDf[principalDf[dropdown] == grp]
 
             if sample_names_toggle:
-                mode_ = 'markers+text'
+                traces.append(
+                    go.Scatter(x=principalDf_temp['PCA1'], y=principalDf_temp['PCA2'], marker={'size': 14},
+                                text=principalDf_temp.index, mode='markers+text', name=grp,
+                                textposition='top center'))
+                ltraces3d.append(go.Scatter3d(
+                    x=principalDf_temp['PCA1'], y=principalDf_temp['PCA2'], z=principalDf_temp['PCA3'],
+                    name=grp,   
+                    text=principalDf_temp.index, mode='markers+text', marker={'size': 8, 'opacity': 0.8,
+                                                                                }))
+
             else:
-                mode_ = 'markers'  #
-
-            traces.append(go.Scatter(x=principalDf['PCA1'], y=principalDf['PCA2'],
-                                     marker={'size': 14, 'colorbar': {'title': '--'},
-                                             'color': df_meta_temp[dropdown]},
-                                     text=principalDf.index, mode=mode_, textposition='top center', showlegend=False))
-
-        else:
-
-            for grp in df_meta_temp[dropdown].unique():
-                principalDf_temp = principalDf[principalDf[dropdown] == grp]
-
-                if sample_names_toggle:
-                    traces.append(
-                        go.Scatter(x=principalDf_temp['PCA1'], y=principalDf_temp['PCA2'], marker={'size': 14},
-                                   text=principalDf_temp.index, mode='markers+text', name=grp,
-                                   textposition='top center'))
-                    ltraces3d.append(go.Scatter3d(
-                        x=principalDf_temp['PCA1'], y=principalDf_temp['PCA2'], z=principalDf_temp['PCA3'],
-                        name=grp,
-                        text=principalDf_temp.index, mode='markers+text', marker={'size': 8, 'opacity': 0.8,
-                                                                                  }))
-
-                else:
-                    traces.append(
-                        go.Scatter(x=principalDf_temp['PCA1'], y=principalDf_temp['PCA2'], marker={'size': 14},
-                                   text=principalDf_temp.index, mode='markers', name=grp))
-                    ltraces3d.append(go.Scatter3d(
-                        x=principalDf_temp['PCA1'], y=principalDf_temp['PCA2'], z=principalDf_temp['PCA3'],
-                        name=grp,
-                        text=principalDf_temp.index, mode='markers', marker={'size': 8, 'opacity': 0.8,
-                                                                             }))
+                traces.append(
+                    go.Scatter(x=principalDf_temp['PCA1'], y=principalDf_temp['PCA2'], marker={'size': 14},
+                                text=principalDf_temp.index, mode='markers', name=grp))
+                ltraces3d.append(go.Scatter3d(
+                    x=principalDf_temp['PCA1'], y=principalDf_temp['PCA2'], z=principalDf_temp['PCA3'],
+                    name=grp,
+                    text=principalDf_temp.index, mode='markers', marker={'size': 8, 'opacity': 0.8,
+                                                                            }))
 
         trace_var = [go.Bar(x=principalDf.columns, y=pca.explained_variance_ratio_)]
 
@@ -1444,33 +1443,30 @@ def update_pca_and_barplot(indata, sample_names_toggle, number_of_genes, biplot_
         width_cor = correlation_matrix.shape[0] * 10
         
         return {'data': traces,
-                'layout': go.Layout(title='Expression values', autosize=True, boxmode='group',
+                'layout': go.Layout(height=600, boxmode='group',
                                     margin={"l": 200, "b": 100, "r": 200},
                                     xaxis={'title': 'PCA1', "showticklabels": False},
                                     yaxis={"title": "PCA2"})}, \
                {"data": ltraces3d,
                 "layout": go.Layout(
-                    height=700, title="...",
+                    height=600,
+
                     scene={"aspectmode": "cube", "xaxis": {"title": "PCA1 %.3f" % pca.explained_variance_ratio_[0], },
                            "yaxis": {"title": "PCA2 %.3f" % pca.explained_variance_ratio_[1], },
                            "zaxis": {"title": "PCA3 %.3f" % pca.explained_variance_ratio_[2], }},
                     clickmode='event+select'), }, \
                {'data': trace_var,
-                'layout': go.Layout(title='', autosize=True, boxmode='group',
+                'layout': go.Layout(title='', height=600, boxmode='group',
                                     margin={"l": 200, "b": 100, "r": 200}, xaxis={"showticklabels": True},
                                     yaxis={"title": "Variance explained"})}, \
                {'data': lPCA_data,
-                'layout': {
-                    'height': 100,
-                    'width': 500,
-                    'xaxis': {'side': 'top'},
-                    'margin': {
-                        'l': 200,
-                        'r': 200,
-                        'b': 150,
-                        't': 100
-                    }
-                }
+                'layout': go.Layout(height=600,
+                                    margin={'l':200,
+                                            'r':200,
+                                            'b':150,
+                                            't':100
+                                            }
+                                    )
                 }
 
 
@@ -1493,8 +1489,7 @@ def populate_dataset_load(invalue):
 @app.callback(
     [Output('DE-table', 'data'),
      Output('pvalue', 'children'),
-     Output('number_of_degenes', 'children'),
-     Output('de_to_enrichr_block', 'style'), ],
+     Output('number_of_degenes', 'children')],
     [Input('sig_submit', 'n_clicks')],
     [State('volcanoplot-input', 'value'),
      State('intermediate-DEtable', 'children'),
@@ -1508,7 +1503,6 @@ def update_de_table(n_clicks, effects, indata, sig_value, basemean):
             raise PreventUpdate
         else:
             datasets = json.loads(indata)
-            print('update_de_table')
             df_degenes = pd.read_json(StringIO(datasets['de_table']), orient='split')
             radiode = datasets['DE_type']
             df_degenes = df_degenes.loc[df_degenes['padj'] <= float(sig_value),]
@@ -1533,7 +1527,7 @@ def update_de_table(n_clicks, effects, indata, sig_value, basemean):
             output_path = os.path.join('data', 'generated', name)
             df_degenes.to_csv(output_path, sep='\t')
 
-            return df_degenes.to_dict('records'), sig_value, number_of_degenes, background_pipe
+            return df_degenes.to_dict('records'), sig_value, number_of_degenes
 
 
 @app.callback(
@@ -1676,172 +1670,125 @@ def run_DE_analysis(n_clicks, indata, program, transformation, force_run, rowsum
         return json.dumps(datasets), 'temp', ''
 
 
-@app.callback(
-    Output('Enrichr_GO_bp_up', 'figure'),
-    Input('Enrichr_GO_bp_up_ph', 'figure')
-)
-def enrichr_tab_out(in1):
+conditions = [
+    ("GO_bp_up", "GO_bp_up_ph"),
+    ("GO_bp_dn", "GO_bp_dn_ph"),
+    ("GO_cell_up", "GO_cell_up_ph"),
+    ("GO_cell_dn", "GO_cell_dn_ph"),
+    ("GO_mf_up", "GO_mf_up_ph"),
+    ("GO_mf_dn", "GO_mf_dn_ph"),
+    ("kegg_up", "kegg_up_ph"),
+    ("kegg_dn", "kegg_dn_ph")
+]
+
+# Function that simply returns the input as output
+def redirect_input(in1):
     return in1
 
+def create_callback(output_id, input_id):
+    @app.callback(
+        Output(output_id, 'figure'),
+        Input(input_id, 'figure')
+    )
+    def redirect_input(in1):
+        return in1
 
-@app.callback(
-    Output('Enrichr_GO_bp_dn', 'figure'),
-    Input('Enrichr_GO_bp_dn_ph', 'figure')
-)
-def enrichr_tab_out(in1):
-    return in1
-
-
-@app.callback(
-    Output('Enrichr_GO_cell_up', 'figure'),
-    Input('Enrichr_GO_cell_up_ph', 'figure')
-)
-def enrichr_tab_out(in1):
-    return in1
-
-
-@app.callback(
-    Output('Enrichr_GO_cell_dn', 'figure'),
-    Input('Enrichr_GO_cell_dn_ph', 'figure')
-)
-def enrichr_tab_out(in1):
-    return in1
-
-
-@app.callback(
-    Output('Enrichr_GO_mf_up', 'figure'),
-    Input('Enrichr_GO_mf_up_ph', 'figure')
-)
-def enrichr_tab_out(in1):
-    return in1
-
-
-@app.callback(
-    Output('Enrichr_GO_mf_dn', 'figure'),
-    Input('Enrichr_GO_mf_dn_ph', 'figure')
-)
-def enrichr_tab_out(in1):
-    return in1
-
-
-@app.callback(
-    Output('Enrichr_kegg_up', 'figure'),
-    Input('Enrichr_kegg_up_ph', 'figure')
-)
-def enrichr_tab_out(in1):
-    return in1
-
-
-@app.callback(
-    Output('Enrichr_kegg_dn', 'figure'),
-    Input('Enrichr_kegg_dn_ph', 'figure')
-)
-def enrichr_tab_out(in1):
-    return in1
+# Generating callbacks dynamically
+for condition, placeholder in conditions:
+    create_callback(f'Enrichr_{condition}', f'Enrichr_{condition}_ph')
 
 
 ##Enrichr
 @app.callback(
-    [Output('Enrichr_GO_bp_up_ph', 'figure'),
-     Output('Enrichr_GO_bp_dn_ph', 'figure'),
-     Output('Enrichr_GO_cell_up_ph', 'figure'),
-     Output('Enrichr_GO_cell_dn_ph', 'figure'),
-     Output('Enrichr_GO_mf_up_ph', 'figure'),
-     Output('Enrichr_GO_mf_dn_ph', 'figure'),
-     Output('Enrichr_kegg_up_ph', 'figure'),
-     Output('Enrichr_kegg_dn_ph', 'figure'),
-     Output('submit_done_enrichr', 'children')],
+    [Output(f'Enrichr_{db}_{state}_ph', 'figure') 
+     for db in ("GO_bp", "GO_cell", "GO_mf", "kegg") 
+     for state in ("up", "dn")],
     Input('btn-enrichr', 'n_clicks'),
     State('intermediate-DEtable', 'children'),
     State('DE-table', 'data'),
-    State('pvalue', 'children'))
+    State('pvalue', 'children')
+)
 def enrichr_up(n_clicks, indata, indata_de, sig_value):
     if n_clicks is None:
         raise PreventUpdate
-    else:
-        datasets = json.loads(indata)
-        df_degenes = pd.DataFrame.from_dict(indata_de)
 
-        radiode = datasets['DE_type']
-        file_string = datasets['file_string']
-        
-        l_databases = ['GO_Biological_Process_2018', 'GO_Cellular_Component_2018', 'GO_Molecular_Function_2018', 'KEGG_2016']
-        lOutput = []
-        lUpDn = ['up', 'dn']
-        out_folder = os.path.join('data', 'generated', 'enrichr')
+    datasets = json.loads(indata)
+    de_genes_df = pd.DataFrame.from_dict(indata_de)
 
-        prefix = os.path.join(out_folder, file_string)
+    up_down_files = split_genes_by_expression(de_genes_df, sig_value)
+    results = run_enrichr_analysis(datasets, up_down_files)
 
-        # Create the directory if it does not exist
-        os.makedirs(out_folder, exist_ok=True)
-        df_degenes = df_degenes[df_degenes['padj'] <= float(sig_value)]
+    return results
 
-        df_degenes_up = df_degenes[df_degenes['log2FoldChange'] > 0]
-        df_degenes_dn = df_degenes[df_degenes['log2FoldChange'] < 0]
+def split_genes_by_expression(de_genes_df, sig_value):
+    de_genes_df = de_genes_df[de_genes_df['padj'] <= float(sig_value)]
+    gene_splits = {
+        'up': de_genes_df[de_genes_df['log2FoldChange'] > 0],
+        'dn': de_genes_df[de_genes_df['log2FoldChange'] < 0]
+    }
+    return gene_splits
 
-        genes_path_all = os.path.join(prefix + '_DE_genes.txt')
-        
-        with open(genes_path_all, 'w') as wf:
-            for hgnc in df_degenes['hgnc']:
-                if hgnc and not isinstance(hgnc, list):
-                    wf.write(hgnc + '\n')
-                elif isinstance(hgnc, list):
-                    wf.write(hgnc[0] + '\n')
+def run_enrichr_analysis(datasets, gene_splits):
+    radiode = datasets['DE_type']
+    file_string = datasets['file_string']
+    databases = ['GO_Biological_Process_2018', 'GO_Cellular_Component_2018', 'GO_Molecular_Function_2018', 'KEGG_2016']
+    out_folder = os.path.join('data', 'generated', 'enrichr')
+    os.makedirs(out_folder, exist_ok=True)
 
-        for db in l_databases:
-            for updn in lUpDn:
-                df_degenes_temp = df_degenes_up if updn == 'up' else df_degenes_dn
-                genes_path = os.path.join(prefix + '_%s_DE_genes.txt' % updn)
-                print(genes_path)
-                if len(df_degenes_temp['hgnc']) > 5:
-                    with open(genes_path, 'w') as wf:
-                        for hgnc in df_degenes_temp['hgnc']:
-                            if hgnc and not isinstance(hgnc, list):
-                                wf.write(hgnc + '\n')
-                            elif isinstance(hgnc, list):
-                                wf.write(hgnc[0] + '\n')
+    output_figures = []
+    for db in databases:
+        for state, genes_df in gene_splits.items():
+            if len(genes_df) > 5:
+                file_path = write_genes_to_file(genes_df, file_string, state, out_folder)
+                result_figure = perform_enrichr_query(file_path, db, state, file_string, out_folder)
+                output_figures.append(result_figure)
+            else:
+                output_figures.append(default_figure(db, state))
 
-                    fOut = os.path.join(prefix + '_' + updn + '_' + db)
-                    print('fOut', fOut)
-                    # Do not perform the same analysis again if file exists
-                    if not os.path.isfile(fOut):
-                        python_executable = sys.executable
-                        enrichr_path = os.path.join('enrichr-api', 'query_enrichr_py3.py')
-                        cmd = f'{python_executable} {enrichr_path} {genes_path} {updn}_{db} {db} {fOut}'
-                        try:
-                            result = subprocess.run(cmd, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-                        except subprocess.CalledProcessError as e:
-                            print("Error executing command:", e)
+    return output_figures
 
-                    df = pd.read_csv(fOut + '.txt', sep='\t', index_col=None)
+def write_genes_to_file(genes_df, file_string, state, out_folder):
+    file_path = os.path.join(out_folder, f'{file_string}_{state}_DE_genes.txt')
+    with open(file_path, 'w') as wf:
+        for hgnc in genes_df['hgnc']:
+            if isinstance(hgnc, list):
+                hgnc = hgnc[0]
+            wf.write(hgnc + '\n')
+    return file_path
 
-                    if 'GO' in db:
-                        df['Term'] = df['Term'].str.replace(r' \(GO:\d+\)$', '', regex=True)
+def perform_enrichr_query(file_path, db, state, file_string, out_folder):
+    output_path = os.path.join(out_folder, f'{file_string}_{state}_{db}')
+    if not os.path.isfile(output_path):
+        enrichr_path = os.path.join('enrichr-api', 'query_enrichr_py3.py')
+        cmd = f'{sys.executable} {enrichr_path} {file_path} {state}_{db} {db} {output_path}'
+        run_subprocess(cmd)
+    return create_figure(output_path, db, state)
 
-                    df = df.sort_values(by='Adjusted P-value')
-                    df_sig = len(df[df['Adjusted P-value'] <= 0.05])
+def run_subprocess(cmd):
+    try:
+        subprocess.run(cmd, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    except subprocess.CalledProcessError as e:
+        print("Error executing command:", e)
 
-                    if df_sig > 0:
-                        df_10 = df.head(df_sig)
-                        df_10.index = df_10['Term']
-                        df_10['-log(padj)'] = df_10['Adjusted P-value'].apply(lambda a: -np.log(a))
-                        df_10['Genes involved (%)'] = df_10['Overlap'].apply(
-                            lambda a: 100 * (int(a.split('/')[0]) / int(a.split('/')[1])))
-                        trace = [go.Bar(x=df_10['Term'], y=df_10['Genes involved (%)'],
-                                        marker={'color': df_10['Adjusted P-value'],
-                                                'colorscale': 'Magma', 'showscale': True})]
-                    else:
-                        trace = [go.Bar()]
-                    output = {'data': trace, 'layout': go.Layout(title=db + '_' + updn, xaxis={'automargin': True}, height=650)}
-                else:
-                    trace = [go.Bar()]
-                    output = {'data': trace, 'layout': go.Layout(title=db + '_' + updn, xaxis={'automargin': True}, height=650)}
+def create_figure(output_path, db, state):
+    df = pd.read_csv(output_path + '.txt', sep='\t')
+    df['Term'] = df['Term'].str.replace(r' \(GO:\d+\)$', '', regex=True)
+    df = df.sort_values(by='Adjusted P-value')
+    significant_terms = df[df['Adjusted P-value'] <= 0.05]
+    if len(significant_terms) > 0:
+        return plot_significant_terms(significant_terms, db, state)
+    return default_figure(db, state)
 
-                lOutput.append(output)
+def plot_significant_terms(df, db, state):
+    df['-log(padj)'] = -np.log(df['Adjusted P-value'])
+    df['Genes involved (%)'] = df['Overlap'].apply(lambda x: 100 * (int(x.split('/')[0]) / int(x.split('/')[1])))
+    trace = go.Bar(x=df['Term'], y=df['Genes involved (%)'], marker={'color': df['-log(padj)'], 'colorscale': 'Magma', 'showscale': True})
+    layout = go.Layout(title=f'{db}_{state}', xaxis={'automargin': True}, height=650)
+    return {'data': [trace], 'layout': layout}
 
-        return lOutput[0], lOutput[1], lOutput[2], lOutput[3], lOutput[4], lOutput[5], lOutput[6], lOutput[7], ''
-
-
+def default_figure(db, state):
+    layout = go.Layout(title=f'{db}_{state} - No significant results', xaxis={'automargin': True}, height=650)
+    return {'data': [go.Bar()], 'layout': layout}
 
 @app.callback(
     Output('export_enrichr_plot', 'children'),
@@ -1855,10 +1802,7 @@ def export_enrichr_plot(n_clicks, indata, prefixes):
         if indata:
             datasets = json.loads(indata)        
             file_string = datasets['file_string']
-            print(file_string)
-
             outdir = os.path.join('data', 'scripts')
-
             enrichr_file = file_string + '_enrichr.R'
             enrichr_file_path = os.path.join('data', 'scripts', enrichr_file)
             enrichr_template_path = os.path.join('data', 'templates', 'plot_enrichr.py')
@@ -1880,7 +1824,7 @@ def export_enrichr_plot(n_clicks, indata, prefixes):
             return ['Can not create plot (run the analysis)']
 
 if __name__ == "__main__":
-    ascii_banner = pyfiglet.figlet_format("RNA analysis")
+    ascii_banner = pyfiglet.figlet_format("\\\ Rnalys")
     print(ascii_banner)
     #app.run_server(debug=True, host='localhost')
     app.run_server(debug=True, dev_tools_ui=True, dev_tools_props_check=True)
