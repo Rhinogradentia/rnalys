@@ -59,6 +59,8 @@ from datetime import datetime
 from functions.deseq2 import calculate_size_factors, estimate_dispersion, fit_glm_nb
 from functions.edgeR import calc_norm_factors, estimate_common_dispersion, estimate_tagwise_dispersion, glm_lrt
 
+current_dir = os.path.dirname(os.path.abspath(__file__))
+os.chdir(current_dir)
 
 # Configuration for external stylesheets
 FONT_AWESOME = "https://use.fontawesome.com/releases/v5.10.2/css/all.css"
