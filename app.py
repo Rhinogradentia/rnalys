@@ -1639,11 +1639,12 @@ def run_DE_analysis(n_clicks, indata, program, transformation, force_run, rowsum
         else:
             try:
                 # Run the subprocess command
-                result = subprocess.run(cmd, check=True, text=True, capture_output=True)
+                #result = subprocess.run(cmd, check=True, text=True, capture_output=True)
+                subprocess.run(cmd, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
                 print("DE analysis completed successfully.")
-                print("Output:", result.stdout)
+                #print("Output:", result.stdout)
             except subprocess.CalledProcessError as e:
-                print("Failed to run edgeR analysis.")
+                print("Failed to run DE analysis.")
                 print("Error:", e.stderr)
 
         df_degenes = pd.read_csv(name_out, sep='\t')
