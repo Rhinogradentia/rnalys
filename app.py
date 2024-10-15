@@ -56,6 +56,9 @@ from demos import dash_reusable_components as drc
 from layout_content import layout_index, layout_page1
 from dash.dependencies import Input, Output, State
 from datetime import datetime
+from functions.deseq2 import calculate_size_factors, estimate_dispersion, fit_glm_nb
+from functions.edgeR import calc_norm_factors, estimate_common_dispersion, estimate_tagwise_dispersion, glm_lrt
+
 
 # Configuration for external stylesheets
 FONT_AWESOME = "https://use.fontawesome.com/releases/v5.10.2/css/all.css"
@@ -1559,7 +1562,6 @@ def export_de(n_clicks, indata, prefixes):
             print('Run DE analysis first')
             return ['Nothing to export']
 
-
 # DE ANALYSIS
 @app.callback(
     Output('intermediate-DEtable', 'children'),
@@ -1606,17 +1608,6 @@ def run_DE_analysis(n_clicks, indata, program, transformation, force_run, rowsum
         name_meta = os.path.join('data', 'generated', f'{file_string}_meta.tab')
         name_out = os.path.join('data', 'generated', f'{file_string}_DE.tab')
 
-        '''
-        elif program == 'limma':
-            if sTotal.count('@') > 1:
-                cmd = 'Rscript ./functions/run_limma_de.R %s %s %s %s %s' % (
-                name_counts, name_meta, 'batch', reference,
-                name_out)
-            else:
-                cmd = 'Rscript ./functions/run_limma_de.R %s %s %s %s %s' % (
-                name_counts, name_meta, 'none', reference,
-                name_out)
-        '''
         name_ma_table = None
 
         if program == 'DESeq2':
@@ -1628,7 +1619,18 @@ def run_DE_analysis(n_clicks, indata, program, transformation, force_run, rowsum
         elif program == 'edgeR':
             r_script_path = os.path.join('functions', 'run_edgeR.R')
             cmd = f'Rscript {r_script_path} {name_counts} {name_meta} {design} {reference} {name_out}'
-            
+        
+        '''
+        elif program == 'limma':
+            if sTotal.count('@') > 1:
+                cmd = 'Rscript ./functions/run_limma_de.R %s %s %s %s %s' % (
+                name_counts, name_meta, 'batch', reference,
+                name_out)
+            else:
+                cmd = 'Rscript ./functions/run_limma_de.R %s %s %s %s %s' % (
+                name_counts, name_meta, 'none', reference,
+                name_out)
+        '''
 
         if os.path.isfile(name_out) and not force_run:
             print("Output file already exists. Use 'force_run' to override.")
@@ -1669,6 +1671,152 @@ def run_DE_analysis(n_clicks, indata, program, transformation, force_run, rowsum
         print('DE done')
         return json.dumps(datasets), 'temp', ''
 
+
+#For future removal of Rscript with interal deseq2 algorithms
+'''
+# DE ANALYSIS
+@app.callback(
+    Output('intermediate-DEtable', 'children'),
+    Output('temp', 'children'),
+    Output('submit-de-done', 'children'),
+    Input('btn-DE', 'n_clicks'),
+    State('intermediate-table', 'children'),
+    State('program', 'value'),
+    State('transformation', 'value'),
+    State('force_run', 'value'),
+    State('rowsum', 'value'),
+    State('design', 'value'),
+    State('reference', 'value'))
+def run_DE_analysis(n_clicks, indata, program, transformation, force_run, rowsum, design, reference):
+    if n_clicks is None:
+        raise PreventUpdate
+    else:
+        datasets = json.loads(indata)
+        outdir = os.path.join('data', 'generated')
+        name_counts = json.loads(datasets['counts_raw_file_name'])
+        file_string = json.loads(datasets['file_string'])
+        logfile = os.path.join(outdir, file_string + '_DE.log')
+
+        data = {
+            'program': [program],
+            'transformation': [transformation],
+            'rowsum': [rowsum],
+            'design': [design],
+            'reference': [reference],
+            'ID': [file_string]
+        }
+        df_new = pd.DataFrame(data)
+        df_new['timestamp'] = datetime.now()
+
+        if os.path.isfile(logfile):
+            df_log = pd.read_csv(logfile)
+            df_log = pd.concat([df_log, df_new], ignore_index=True)
+        else:
+            df_log = df_new
+
+        df_log.to_csv(logfile, index=False)
+
+        # Load counts and metadata
+        name_meta = os.path.join('data', 'generated', f'{file_string}_meta.tab')
+        name_out = os.path.join('data', 'generated', f'{file_string}_DE.tab')
+
+        counts = pd.read_csv(name_counts, sep='\t', index_col=0)
+        metadata = pd.read_csv(name_meta, sep='\t', index_col=0)
+
+        # Remove rows with low counts if rowsum parameter is set
+        if rowsum is not None and rowsum != '':
+            rowsum_threshold = int(rowsum)
+            counts = counts[counts.sum(axis=1) >= rowsum_threshold]
+
+        # Prepare the design matrix
+        design_factors = design.replace('~', '').split('+')
+        design_factors = [factor.strip() for factor in design_factors]
+        design_matrix = metadata[design_factors]
+        design_matrix.index = metadata.index  # Ensure the index aligns with counts columns
+
+        # Convert categorical variables to appropriate format
+        for col in design_matrix.columns:
+            if design_matrix[col].dtype == object or str(design_matrix[col].dtype).startswith('category'):
+                design_matrix[col] = pd.Categorical(design_matrix[col])
+
+        # Ensure counts columns match design matrix index
+        counts = counts.loc[:, design_matrix.index]
+
+        # Prepare the contrast or coefficient to test
+        coef_name = design_factors[-1]  # Testing the last factor in the design
+
+        # Handle reference level if specified
+        if reference and ':' in reference:
+            factor, ref_level = reference.split(':')
+            if factor in design_matrix.columns:
+                design_matrix[factor] = pd.Categorical(design_matrix[factor])
+                design_matrix[factor].cat.set_categories([ref_level] + [x for x in design_matrix[factor].cat.categories if x != ref_level], inplace=True)
+            else:
+                print(f"Reference factor {factor} not in design matrix columns")
+
+        # Run the DE analysis using the appropriate function
+        if program == 'DESeq2':
+            # Normalize counts
+            size_factors = calculate_size_factors(counts)
+            normalized_counts = counts.div(size_factors, axis=1)
+
+            # Estimate dispersion
+            dispersions = estimate_dispersion(counts, design_matrix, size_factors)
+
+            # Fit the model and get results
+            results_df = fit_glm_nb(counts, design_matrix, size_factors, dispersions, coef_name)
+
+            # Adjust p-values
+            results_df['padj'] = multipletests(results_df['p_value'], method='fdr_bh')[1]
+            results_df.rename(columns={'p_value': 'pvalue'}, inplace=True)
+            df_degenes = results_df
+
+        elif program == 'edgeR':
+            # Normalize counts
+            norm_factors = calc_norm_factors(counts)
+
+            # Estimate dispersion
+            groups = design_matrix[coef_name].values
+            common_dispersion = estimate_common_dispersion(counts, groups, norm_factors)
+            tagwise_dispersion = estimate_tagwise_dispersion(counts, groups, norm_factors, common_dispersion)
+
+            # Fit the model and get results
+            results_df = glm_lrt(counts, design_matrix, norm_factors, tagwise_dispersion, coef_name)
+
+            # Adjust p-values
+            results_df['padj'] = multipletests(results_df['p_value'], method='fdr_bh')[1]
+            results_df.rename(columns={'logFC': 'log2FoldChange', 'p_value': 'pvalue'}, inplace=True)
+            df_degenes = results_df
+
+        else:
+            print("Unknown program specified.")
+            return None, None, None
+
+        # Save the results to name_out
+        df_degenes.to_csv(name_out, sep='\t')
+
+        # The rest of the code remains the same
+        df_degenes['Ensembl'] = df_degenes.index
+        df_degenes = df_degenes.sort_values(by=['log2FoldChange'])
+        df_degenes['padj'] = df_degenes['padj'].apply(str)
+        df_degenes['pvalue'] = df_degenes['pvalue'].apply(str)
+        overlap_genes = list(set(df_degenes.index).intersection(set(df_symbol.index)))
+        try:
+            dTranslate = dict(df_symbol.loc[overlap_genes]['hgnc_symbol'])
+            df_degenes['hgnc'] = [dTranslate.get(x, x) for x in df_degenes.index]
+        except:
+            pass
+
+        # Since we didn't compute MA plot data, we'll set ma_table to an empty DataFrame
+        ma_table = pd.DataFrame()
+
+        datasets = {'de_table': df_degenes.to_json(orient='split'), 'DE_type': program, 'file_string': file_string, 'ma_table': ma_table.to_json(orient='split')}
+
+        print('DE analysis completed.')
+        return json.dumps(datasets), 'temp', ''
+
+
+'''
 
 conditions = [
     ("GO_bp_up", "GO_bp_up_ph"),
