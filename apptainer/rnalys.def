@@ -2,10 +2,20 @@ Bootstrap: docker
 From: python:3.9
 
 %post
-    # Install system dependencies and R
+    # Add R repository
     apt-get update && apt-get install -y \
-        r-base \
-        r-base-dev \
+        software-properties-common \
+        dirmngr \
+        wget
+
+    # Add R 4.2 repository
+    wget -qO- https://cloud.r-project.org/bin/linux/ubuntu/marutter_pubkey.asc | tee -a /etc/apt/trusted.gpg.d/cran_ubuntu_key.asc
+    add-apt-repository "deb https://cloud.r-project.org/bin/linux/ubuntu $(lsb_release -cs)-cran40/"
+
+    # Install R 4.2 and dependencies
+    apt-get update && apt-get install -y \
+        r-base=4.2.* \
+        r-base-dev=4.2.* \
         libcurl4-gnutls-dev \
         libxml2-dev \
         libssl-dev \
@@ -22,24 +32,50 @@ From: python:3.9
     git clone https://github.com/Christofferfrisk/rnalys.git /app
     cd /app
 
-    # Install Python dependencies in a specific order to resolve conflicts
-    pip install --no-cache-dir pandas==1.4.0
-    pip install --no-cache-dir numpy==1.23.5
-    pip install --no-cache-dir dash-bio==1.0.2
-    pip install --no-cache-dir statsmodels==0.13.5
-    
-    # Now install the rest of the requirements, ignoring the conflicting versions
-    pip install --no-cache-dir -r requirements.txt --no-deps
-    
-    # Install potentially missing dependencies
+    # Install Python dependencies with exact versions
     pip install --no-cache-dir \
-        dash==2.9.3 \
-        plotly==5.13.1 \
-        scipy==1.10.1 \
-        scikit-learn==1.2.2
+        dash==2.6.2 \
+        dash-auth==1.4.1 \
+        dash-bio==1.0.2 \
+        dash-daq==0.5.0 \
+        dash-bootstrap-components==1.4.1 \
+        dash-core-components==2.0.0 \
+        dash-html-components==2.0.0 \
+        dash-mantine-components==0.12.1 \
+        dash-table==5.0.0 \
+        Werkzeug==2.2.2 \
+        Flask==2.2.2 \
+        Flask-Compress==1.13 \
+        Flask-SeaSurf==1.1.1 \
+        matplotlib==3.5.3 \
+        pandas==1.3.5 \
+        plotly==5.10.0 \
+        statsmodels==0.13.5
 
-    # Install R packages
-    Rscript install_packages.R
+    # Create R package installation script with exact versions
+    echo '# Set CRAN mirror
+    options(repos = c(CRAN = "https://cloud.r-project.org"))
+
+    # Install BiocManager
+    if (!require("BiocManager", quietly = TRUE))
+        install.packages("BiocManager")
+
+    # Install specific Bioconductor version compatible with R 4.2
+    BiocManager::install(version = "3.16", force = TRUE, ask = FALSE)
+
+    # Install required packages
+    BiocManager::install(c(
+        "DESeq2",
+        "edgeR",
+        "limma",
+        "statmod",
+        "ggplot2",
+        "dplyr",
+        "qsmooth"
+    ), force = TRUE, ask = FALSE)' > /app/install_r_packages.R
+
+    # Run the R package installation script
+    Rscript /app/install_r_packages.R
 
 %startscript
     cd /app
@@ -51,6 +87,7 @@ From: python:3.9
 %labels
     Author Maintainer
     Version v1.0
-
 %help
       Created based on the installation instructions on the original repo and Claude 3.5 Sonnet
+      Original Source https://github.com/Christofferfrisk/rnalys
+                  
