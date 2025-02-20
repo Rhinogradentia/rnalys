@@ -25,7 +25,8 @@ import json
 import math
 import flask
 import dash
-import dash_auth
+# this is deprecated - correct import already below
+# import dash_auth
 import dash_table as dt
 import pandas as pd
 import numpy as np
