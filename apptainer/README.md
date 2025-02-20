@@ -11,11 +11,11 @@ apptainer build rnalys.sif rnalys.def
 Run image:
 
 ```
-apptainer run --bind 8050:8050 rnalys.sif
+apptainer run rnalys.sif
 
 # or
 
-singularity run --bind 8050:8050 rnalys.sif
+singularity run rnalys.sif
 ```
 
 Access App:
