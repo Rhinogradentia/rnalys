@@ -27,7 +27,7 @@ import flask
 import dash
 # this is deprecated - correct import already below
 # import dash_auth
-import dash_table as dt
+# import dash_table as dt
 import pandas as pd
 import numpy as np
 import plotly.graph_objs as go
@@ -50,6 +50,7 @@ from io import StringIO
 from dash import dcc
 from dash import html
 from dash import dash_table
+from dash.dash_table.Format import Group
 from collections import Counter
 from dash.exceptions import PreventUpdate
 from sklearn.decomposition import PCA
